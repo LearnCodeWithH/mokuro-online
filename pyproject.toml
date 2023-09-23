@@ -1,0 +1,14 @@
+[project]
+name = "mokuro-api"
+version = "0.0.1"
+description = "API to run mokuro in a dedicated server"
+dependencies = [
+    "mokuro",
+    "Flask==2.3.3",
+    "Flask-Caching==2.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
