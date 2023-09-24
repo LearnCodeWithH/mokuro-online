@@ -4,14 +4,19 @@ class Config(object):
     # 10k of 'mokuro jsons' using (the rare size of) 10k each, takes 100mb of space...
     CACHE_THRESHOLD = 30000
     CACHE_DIR = "./cache"
+    STRICT_HASHES = False
+    STRICT_NEW_IMAGES = False
 
 
 class DevelopmentConfig(Config):
-    pass
+    STRICT_HASHES = True
+    STRICT_NEW_IMAGES = False
 
 
 class TestingConfig(Config):
     TESTING = True
+    STRICT_HASHES = False
+    STRICT_NEW_IMAGES = False
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = 0
     CACHE_THRESHOLD = 0
@@ -19,4 +24,5 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
-    pass
+    STRICT_HASHES = True
+    STRICT_NEW_IMAGES = True
