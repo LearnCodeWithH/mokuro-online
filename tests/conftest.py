@@ -6,8 +6,7 @@ from flask import url_for
 
 @pytest.fixture()
 def app():
-    app = create_app()
-    app.config.from_object(TestingConfig)
+    app = create_app(TestingConfig)
     yield app
     # clean up / reset resources here
 
@@ -29,7 +28,6 @@ def runner(app):
 
 @pytest.fixture()
 def cache(app):
-    app_cache.init_app(app)
     return app_cache
 
 # Urls
@@ -42,9 +40,9 @@ def url_hash_check(ctx):
 
 
 @pytest.fixture()
-def url_new_images(ctx):
+def url_new_pages(ctx):
     with ctx:
-        return url_for("v1.new_images")
+        return url_for("v1.new_pages")
 
 
 @pytest.fixture()

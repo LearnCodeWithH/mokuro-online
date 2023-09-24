@@ -6,6 +6,7 @@ class Config(object):
     CACHE_DIR = "./cache"
     STRICT_HASHES = False
     STRICT_NEW_IMAGES = False
+    MAX_IMAGE_SIZE = 5_000_000  # 5MB
 
 
 class DevelopmentConfig(Config):
