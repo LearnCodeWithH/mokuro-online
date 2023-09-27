@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from hashlib import md5
 from flask import request, Blueprint, current_app, flash, get_flashed_messages
-from . import cache
+from . import PAGE_CACHE
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
 hash_reg = re.compile("[a-f0-9]{32}")
@@ -46,7 +46,7 @@ def hash_check():
         if not hash_reg.fullmatch(hs_lower):
             if STRICT_HASHES:
                 return {"error": "Invalid MD5 hash was given"}, 400
-        elif not cache.has(hs_lower):
+        elif not current_app.extensions[PAGE_CACHE].has(hs_lower):
             new.append(hs)
 
     return {"new": new}
@@ -104,7 +104,7 @@ def new_pages():
                 break
             continue
 
-        if cache.has(hs):
+        if current_app.extensions[PAGE_CACHE].has(hs):
             flash(e_already_have, "error")
             if STRICT_NEW_IMAGES:
                 flash(e_unnaceptable, "error")
@@ -122,7 +122,7 @@ def new_pages():
             flash(f'Failed OCR of "{name}":' + result["error"], "info")
         else:
             flash(f'Finished OCR of "{name}" successfully', "info")
-            cache.set(hs, result)
+            current_app.extensions[PAGE_CACHE].set(hs, result)
 
     if futures:
         flash(f'Finished OCR of all {len(futures)} files', "info")

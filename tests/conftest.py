@@ -1,5 +1,5 @@
 import pytest
-from app import create_app, cache as app_cache
+from app import create_app, PAGE_CACHE
 from app.config import TestingConfig
 from flask import url_for
 
@@ -25,7 +25,7 @@ def runner(app):
 
 @pytest.fixture()
 def cache(app):
-    return app_cache
+    return app.extensions[PAGE_CACHE]
 
 
 # Urls
