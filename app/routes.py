@@ -33,21 +33,15 @@ def hash_check():
         request.is_json and
         isinstance(request.json, list) and
         all(request.json) and
-        all(map(lambda e: isinstance(e, str), request.json))
+        all(map(lambda hs: isinstance(hs, str), request.json)) and
+        all(map(lambda hs: hash_reg.fullmatch(hs.lower()), request.json))
     ):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
-    STRICT_HASHES = bool(current_app.config["STRICT_HASHES"])
-
-    new = []
-
-    for hs in request.json:
-        hs_lower = hs.lower()
-        if not hash_reg.fullmatch(hs_lower):
-            if STRICT_HASHES:
-                return {"error": "Invalid MD5 hash was given"}, 400
-        elif not current_app.extensions[PAGE_CACHE].has(hs_lower):
-            new.append(hs)
+    new = [
+        hs for hs in request.json
+        if not current_app.extensions[PAGE_CACHE].has(hs.lower())
+    ]
 
     return {"new": new}
 
