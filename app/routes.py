@@ -3,7 +3,7 @@ import concurrent.futures
 import functools
 import threading
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePath
 from hashlib import md5
 from flask import request, Blueprint, current_app, flash, get_flashed_messages
 from . import PAGE_CACHE
@@ -139,24 +139,38 @@ def new_pages():
 def make_html():
     if not (
         request.is_json and
-        request.json and
-        isinstance(request.json, dict) and
-        all(request.json.keys()) and
-        all(request.json.values()) and
-        all(map(lambda e: isinstance(e, str), request.json.values())) and
-        all(map(lambda hs: hash_reg.fullmatch(hs.lower()), request.json.keys()))
+        "title" in request.json and
+        "pages" in request.json and
+        isinstance(request.json["title"], str) and
+        isinstance(request.json["pages"], dict) and
+        request.json["title"].strip() and
+        request.json["pages"] and
+        all(map(lambda s: isinstance(s, str) and s.strip(), request.json["pages"].values())) and
+        all(map(lambda hs: hash_reg.fullmatch(hs.lower()),
+                request.json["pages"].keys()))
     ):
-        return {"error": "Only non-empty JSON objects accepted. Schema: {img_hash: img_path}"}, 415
+        return {"error": 'Only non-empty JSON objects accepted.\nSchema: { "title": "file_title", "pages": {img_hash: img_path}}'}, 415
 
-    results = dict(zip(
-        request.json.keys(),
-        current_app.extensions[PAGE_CACHE].get_many(*request.json.keys())
+    title = request.json["title"].strip()
+    pages = dict(zip(
+        map(lambda s: s.strip(), request.json["pages"].values()),
+        current_app.extensions[PAGE_CACHE].get_many(
+            *request.json["pages"].keys())
     ))
 
-    if not all(results.values()):
+    if not all(pages.values()):
         return {"error": "Asked for page not in cache"}, 400
 
-    return {}
+    try:
+        og = overlay_generator()
+        page_htmls = [
+            og.get_page_html(image_result, PurePath(image_path))
+            for image_path, image_result in pages.items()
+        ]
+        return og.get_index_html(page_htmls, f'{title} | mokuro', True, False)
+
+    except Exception as e:
+        return {"error": str(e)}, 400
 
 
 def do_page_ocr(hs, name, temp_file):
