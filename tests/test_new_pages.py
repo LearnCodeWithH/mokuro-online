@@ -4,8 +4,8 @@ from hashlib import md5
 from app.routes import overlay_generator
 
 test_dir = Path(__file__).parent
-p1 = test_dir / "page1.webp"
-p2 = test_dir / "page2.jpg"
+p1 = Path(__file__).parent / "res/page1.webp"
+p2 = Path(__file__).parent / "res/page2.jpg"
 
 
 def flat_map(f, xs):

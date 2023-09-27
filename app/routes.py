@@ -128,9 +128,26 @@ def new_pages():
 
 @v1.get('/make_html')
 def make_html():
-    return {
-        "AWD!@#SDAwd": {"result": "adwdawdawd"}
-    }
+    if not (
+        request.is_json and
+        request.json and
+        isinstance(request.json, dict) and
+        all(request.json.keys()) and
+        all(request.json.values()) and
+        all(map(lambda e: isinstance(e, str), request.json.values())) and
+        all(map(lambda hs: hash_reg.fullmatch(hs.lower()), request.json.keys()))
+    ):
+        return {"error": "Only non-empty JSON objects accepted. Schema: {img_hash: img_path}"}, 415
+
+    results = dict(zip(
+        request.json.keys(),
+        current_app.extensions[PAGE_CACHE].get_many(*request.json.keys())
+    ))
+
+    if not all(results.values()):
+        return {"error": "Asked for page not in cache"}, 400
+
+    return {}
 
 
 def do_page_ocr(hs, name, temp_file):
