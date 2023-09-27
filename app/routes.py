@@ -1,12 +1,30 @@
 import re
+import concurrent.futures
+import functools
+import threading
+import tempfile
+from pathlib import Path
 from hashlib import md5
-from flask import request, Blueprint, current_app
-from werkzeug.utils import secure_filename
-from markupsafe import escape
+from flask import request, Blueprint, current_app, flash, get_flashed_messages
 from . import cache
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
 hash_reg = re.compile("[a-f0-9]{32}")
+_og_lock = threading.Lock()
+
+
+@functools.cache
+def overlay_generator():
+    if _og_lock.locked():
+        # await until the first call completes
+        with _og_lock:
+            return overlay_generator()
+    with _og_lock:
+        # This take way too long to import and load
+        from mokuro import OverlayGenerator
+        og = OverlayGenerator()
+        og.init_models()
+        return og
 
 
 @v1.post('/new-hashes')
@@ -19,16 +37,16 @@ def hash_check():
     ):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
-    strict_hashes = bool(current_app.config["STRICT_HASHES"])
+    STRICT_HASHES = bool(current_app.config["STRICT_HASHES"])
 
     new = []
 
     for hs in request.json:
         hs_lower = hs.lower()
         if not hash_reg.fullmatch(hs_lower):
-            if strict_hashes:
+            if STRICT_HASHES:
                 return {"error": "Invalid MD5 hash was given"}, 400
-        elif not cache.has(hs_lower):  # TODO: check queue as well
+        elif not cache.has(hs_lower):
             new.append(hs)
 
     return {"new": new}
@@ -36,43 +54,82 @@ def hash_check():
 
 @v1.post('/new_pages')
 def new_pages():
-    if not request.files:
-        return {"error": "No files were uploaded"}, 415
-
     MAX_IMAGE_SIZE = current_app.config["MAX_IMAGE_SIZE"]
     STRICT_NEW_IMAGES = current_app.config["STRICT_NEW_IMAGES"]
 
-    e_too_large = (
-        {"error": f"File size is too large. At most {MAX_IMAGE_SIZE} bytes are accepted"}, 415)
-    e_file_empty = ({"error": "Empty file was uploaded"}, 415)
-    e_not_image = ({"error": "Files need to be images"}, 415)
-    e_already_have = (
-        {"error": "We already have the page. You must only upload brand new pages"}, 415)
+    # TODO: improve flashing images to include file name
 
-    # first pass
+    e_too_large = f"File size is too large. At most {MAX_IMAGE_SIZE} bytes are accepted"
+    e_file_empty = "Empty file was uploaded"
+    e_not_image = "Files need to be images"
+    e_already_have = "We already have the page in cache"
+    e_already_uploaded = "The same page was already uploaded"
+    e_unnaceptable = "Ignoring new images because of unacceptable client error"
+
+    futures = {}
+
+    if not request.files:
+        flash("No files were uploaded", "error")
+
     for file in request.files.values():
+        name = file.name
+
         if file.content_length and file.content_length > MAX_IMAGE_SIZE:
-            return e_too_large
+            flash(e_too_large, "error")
+            continue
         if file.mimetype and not file.mimetype.startswith("image/"):
-            return e_not_image
-
-    for file in request.files.values():
-        blob = file.read()
-        if not blob:
-            return e_file_empty
-        if len(blob) > MAX_IMAGE_SIZE:
-            return e_too_large
-
-        hs = md5(blob).hexdigest()
-        if cache.has(hs):  # TODO: check queue as well
-            if STRICT_NEW_IMAGES:
-                return e_already_have
+            flash(e_not_image, "error")
             continue
 
-        # TODO: add to job queue
-        cache.set(hs, "DUMMY")
+        blob = file.read()
+        flash(f'Uploaded file "{name}" successfully', "info")
 
-    return {}
+        if not blob:
+            flash(e_file_empty, "error")
+            continue
+
+        if len(blob) > MAX_IMAGE_SIZE:
+            flash(e_too_large, "error")
+            if STRICT_NEW_IMAGES:
+                flash(e_unnaceptable, "error")
+                break
+            continue
+
+        hs = md5(blob).hexdigest()
+
+        if hs in futures:
+            flash(e_already_uploaded, "error")
+            if STRICT_NEW_IMAGES:
+                flash(e_unnaceptable, "error")
+                break
+            continue
+
+        if cache.has(hs):
+            flash(e_already_have, "error")
+            if STRICT_NEW_IMAGES:
+                flash(e_unnaceptable, "error")
+                break
+            continue
+
+        temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
+        temp_file.write(blob)
+        futures[hs] = current_app.extensions["executor"].submit(
+            do_page_ocr, hs, name, temp_file)
+
+    for future in concurrent.futures.as_completed(futures.values()):
+        hs, name, result = future.result()
+        if "error" in result:
+            flash(f'Failed OCR of "{name}":' + result["error"], "info")
+        else:
+            flash(f'Finished OCR of "{name}" successfully', "info")
+            cache.set(hs, result)
+
+    if futures:
+        flash(f'Finished OCR of all {len(futures)} files', "info")
+    else:
+        flash('No files were processed', "info")
+
+    return get_flashed_messages(with_categories=True)
 
 
 @v1.get('/make_html')
@@ -80,3 +137,22 @@ def make_html():
     return {
         "AWD!@#SDAwd": {"result": "adwdawdawd"}
     }
+
+
+def do_page_ocr(hs, name, temp_file):
+    try:
+        path = Path(temp_file.name)
+
+        if not path.exists():
+            raise Exception("Internal Server Error: path doesn't exists")
+        if not path.is_file():
+            raise Exception("Internal Server Error: path is not a file")
+
+        flash(f'Starting OCR of "{name}"', "info")
+
+        return hs, name, overlay_generator().mpocr(path)
+    except Exception as e:
+        return hs, name, {"error": str(e)}
+    finally:
+        # either way, when temp_file is garbage collected, it will be deleted
+        temp_file.close()
