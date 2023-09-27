@@ -1,7 +1,7 @@
 import io
 from pathlib import Path
 from hashlib import md5
-from app.routes import overlay_generator
+from app.routes import manga_page_ocr
 
 test_dir = Path(__file__).parent
 p1 = Path(__file__).parent / "res/page1.webp"
@@ -21,13 +21,13 @@ def test_files_exist():
 
 
 def test_ocr_works_page1():
-    result = overlay_generator().mpocr(p1)
+    result = manga_page_ocr(p1)
     assert "blocks" in result
     assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
 
 
 def test_ocr_works_page2():
-    result = overlay_generator().mpocr(p2)
+    result = manga_page_ocr(p2)
     # sometimes it finds something that is not text, like "・"
     assert "blocks" in result
     assert 3 > len("".join(flat_map(lambda b: b['lines'], result["blocks"])))

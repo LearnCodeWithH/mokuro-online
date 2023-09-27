@@ -20,11 +20,20 @@ def overlay_generator():
         with _og_lock:
             return overlay_generator()
     with _og_lock:
-        # This take way too long to import and load
+        # This take way too long to import
         from mokuro import OverlayGenerator
         og = OverlayGenerator()
-        og.init_models()
+
         return og
+
+
+def manga_page_ocr(*args, **kwargs):
+    og = overlay_generator()
+    if og.mpocr is None:
+        with _og_lock:
+            # This take way too long to init
+            og.init_models()
+    return og.mpocr(*args, **kwargs)
 
 
 @v1.post('/new-hashes')
@@ -161,7 +170,7 @@ def do_page_ocr(hs, name, temp_file):
 
         flash(f'Starting OCR of "{name}"', "info")
 
-        return hs, name, overlay_generator().mpocr(path)
+        return hs, name, manga_page_ocr(path)
     except Exception as e:
         return hs, name, {"error": str(e)}
     finally:
