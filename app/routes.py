@@ -69,7 +69,7 @@ def new_pages():
     e_already_uploaded = "The same page was already uploaded"
     e_unnaceptable = "Ignoring new images because of unacceptable client error"
 
-    futures = {}
+    jobs = {}
 
     if not request.files:
         flash("No files were uploaded", "error")
@@ -100,7 +100,7 @@ def new_pages():
 
         hs = md5(blob).hexdigest()
 
-        if hs in futures:
+        if hs in jobs:
             flash(e_already_uploaded, "error")
             if STRICT_NEW_IMAGES:
                 flash(e_unnaceptable, "error")
@@ -116,10 +116,14 @@ def new_pages():
 
         temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
         temp_file.write(blob)
-        futures[hs] = current_app.extensions["executor"].submit(
-            do_page_ocr, hs, name, temp_file)
+        jobs[hs] = (hs, name, temp_file)
 
-    for future in concurrent.futures.as_completed(futures.values()):
+    futures = [
+        current_app.extensions["executor"].submit(do_page_ocr, *job)
+        for job in jobs.values()
+    ]
+
+    for future in concurrent.futures.as_completed(futures):
         hs, name, result = future.result()
         if "error" in result:
             flash(f'Failed OCR of "{name}":' + result["error"], "info")
