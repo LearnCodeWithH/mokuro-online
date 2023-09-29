@@ -10,6 +10,7 @@ def create_app(config_class=DevelopmentConfig):
 
     app.config.from_object(config_class)
     app.config.from_envvar('MOKURO_API_SETTINGS', silent=True)
+    app.config.from_prefixed_env(prefix="MOKURO_API")
 
     Executor(app)
     app.extensions[PAGE_CACHE] = Cache(app, config={
