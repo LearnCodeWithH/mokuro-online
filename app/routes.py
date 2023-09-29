@@ -47,10 +47,10 @@ def hash_check():
     ):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
-    new = [
-        hs for hs in request.json
+    new = tuple(
+        hs for hs in dict.fromkeys(request.json)
         if not current_app.extensions[PAGE_CACHE].has(hs.lower())
-    ]
+    )
 
     return {"new": new}
 
