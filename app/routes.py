@@ -49,6 +49,21 @@ def hash_check():
     return {"new": new}
 
 
+@v1.post('/ocr')
+def ocr():
+    if not (request.is_json and valid_hash_list(request.json)):
+        return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
+
+    hashes = tuple(hs for hs in dict.fromkeys(request.json))
+    results = current_app.extensions[PAGE_CACHE].get_many(
+        *map(lambda hs: hs.lower(), hashes))
+
+    ocr = {hs: rs for hs, rs in zip(hashes, results) if rs != None}
+    new = tuple(hs for hs, rs in zip(hashes, results) if rs == None)
+
+    return {"ocr": ocr, "new": new}
+
+
 @v1.post('/new_pages')
 def new_pages():
     MAX_IMAGE_SIZE = current_app.config["MAX_IMAGE_SIZE"]
