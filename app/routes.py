@@ -139,7 +139,7 @@ def new_pages():
     return get_flashed_messages(with_categories=True)
 
 
-@v1.get('/make_html')
+@v1.post('/make_html')
 def make_html():
     if not (
         request.is_json and
