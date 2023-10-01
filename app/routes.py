@@ -38,13 +38,7 @@ def manga_page_ocr(*args, **kwargs):
 
 @v1.post('/new-hashes')
 def hash_check():
-    if not (
-        request.is_json and
-        isinstance(request.json, list) and
-        all(request.json) and
-        all(map(lambda hs: isinstance(hs, str), request.json)) and
-        all(map(lambda hs: hash_reg.fullmatch(hs.lower()), request.json))
-    ):
+    if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
     new = tuple(
@@ -143,17 +137,10 @@ def new_pages():
 def make_html():
     if not (
         request.is_json and
-        "title" in request.json and
-        "pages" in request.json and
-        isinstance(request.json["title"], str) and
-        isinstance(request.json["pages"], dict) and
-        request.json["title"].strip() and
-        request.json["pages"] and
-        all(map(lambda s: isinstance(s, str) and s.strip(), request.json["pages"].values())) and
-        all(map(lambda hs: hash_reg.fullmatch(hs.lower()),
-                request.json["pages"].keys()))
+        "title" in request.json and valid_title(request.json["title"]) and
+        "pages" in request.json and valid_image_map(request.json["pages"])
     ):
-        return {"error": 'Only non-empty JSON objects accepted.\nSchema: { "title": "file_title", "pages": {img_hash: img_path}}'}, 415
+        return {"error": 'Only non-empty JSON objects accepted.\nSchema: { "title": "file_title", "pages": {img_hash: img_path, ...}}'}, 415
 
     title = request.json["title"].strip()
     pages = dict(zip(
@@ -175,6 +162,28 @@ def make_html():
 
     except Exception as e:
         return {"error": str(e)}, 400
+
+
+def valid_hash_list(hashes):
+    return (
+        isinstance(hashes, list) and
+        all(hashes) and
+        all(map(lambda hs: isinstance(hs, str), hashes)) and
+        all(map(lambda hs: hash_reg.fullmatch(hs.lower()), hashes))
+    )
+
+
+def valid_title(title):
+    return isinstance(title, str) and title.strip()
+
+
+def valid_image_map(img_map):
+    return (
+        img_map and
+        isinstance(img_map, dict) and
+        all(map(lambda s: isinstance(s, str) and s.strip(), img_map.values())) and
+        valid_hash_list(list(img_map.keys()))
+    )
 
 
 def do_page_ocr(hs, name, temp_file):
