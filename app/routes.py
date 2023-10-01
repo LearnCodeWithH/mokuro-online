@@ -153,25 +153,28 @@ def make_html():
     if not (
         request.is_json and
         "title" in request.json and valid_title(request.json["title"]) and
-        "pages" in request.json and valid_image_map(request.json["pages"])
+        "page_map" in request.json and
+        valid_image_map(request.json["page_map"])
     ):
-        return {"error": 'Only non-empty JSON objects accepted.\nSchema: { "title": "file_title", "pages": {img_hash: img_path, ...}}'}, 415
+        return {"error": 'Only non-empty JSON objects accepted.\nSchema: {"title": "file_title", "page_map": [[img_path, img_hash], ...]}'}, 415
 
     title = request.json["title"].strip()
-    pages = dict(zip(
-        map(lambda s: s.strip(), request.json["pages"].values()),
-        current_app.extensions[PAGE_CACHE].get_many(
-            *request.json["pages"].keys())
-    ))
+    page_map = tuple(
+        zip(
+            map(lambda img_tpl: img_tpl[0].strip(), request.json["page_map"]),
+            current_app.extensions[PAGE_CACHE].get_many(
+                *map(lambda img_tpl: img_tpl[1].lower(), request.json["page_map"])),
+        )
+    )
 
-    if not all(pages.values()):
+    if not all(page_map):
         return {"error": "Asked for page not in cache"}, 400
 
     try:
         og = overlay_generator()
         page_htmls = [
             og.get_page_html(image_result, PurePath(image_path))
-            for image_path, image_result in pages.items()
+            for image_path, image_result in page_map
         ]
         return og.get_index_html(page_htmls, f'{title} | mokuro', True, False)
 
@@ -195,9 +198,10 @@ def valid_title(title):
 def valid_image_map(img_map):
     return (
         img_map and
-        isinstance(img_map, dict) and
-        all(map(lambda s: isinstance(s, str) and s.strip(), img_map.values())) and
-        valid_hash_list(list(img_map.keys()))
+        isinstance(img_map, list) and
+        all(map(lambda tp: isinstance(tp, list), img_map)) and
+        all(map(lambda tp: isinstance(tp[0], str) and tp[0].strip(), img_map)) and
+        valid_hash_list(list(map(lambda tp: tp[1], img_map)))
     )
 
 
