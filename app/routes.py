@@ -49,9 +49,12 @@ def hash_check():
     if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
+    with current_app.queue_lock:
+        queue = frozenset(current_app.queue)
     new = tuple(
         hs for hs in dict.fromkeys(request.json)
-        if not current_app.extensions[PAGE_CACHE].has(hs.lower())
+        if (not hs.lower() in queue and
+            not current_app.extensions[PAGE_CACHE].has(hs.lower()))
     )
 
     return {"new": new}
@@ -123,6 +126,11 @@ def new_pages():
             yield cflash(e_key_not_hash, "error")
             continue
 
+        with current_app.queue_lock:
+            if hs in current_app.queue:
+                yield cflash(e_already_have, "error")
+                continue
+
         if current_app.extensions[PAGE_CACHE].has(hs):
             yield cflash(e_already_have, "error")
             continue
@@ -155,9 +163,15 @@ def new_pages():
                 break
             continue
 
-        temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
-        temp_file.write(blob)
-        jobs[hs] = (hs, name, temp_file)
+        with current_app.queue_lock:
+            if hs in current_app.queue:
+                yield cflash(e_already_have, "error")
+                continue
+
+            temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
+            temp_file.write(blob)
+            jobs[hs] = (hs, name, temp_file)
+            current_app.queue[hs] = None  # TODO
         yield cflash(f'Uploaded file "{name}" successfully', "success")
 
     futures = [
@@ -171,7 +185,6 @@ def new_pages():
             yield cflash(f'Failed OCR of "{name}":' + result["error"], "error")
         else:
             yield cflash(f'Finished OCR of "{name}" successfully', "success")
-            current_app.extensions[PAGE_CACHE].set(hs, result)
 
     if futures:
         yield cflash(f'Finished OCR of all {len(futures)} files', "success")
@@ -246,10 +259,14 @@ def do_page_ocr(hs, name, temp_file):
             raise Exception("Internal Server Error: path is not a file")
 
         flash(f'Starting OCR of "{name}"', "info")
+        result = manga_page_ocr(path)
+        current_app.extensions[PAGE_CACHE].set(hs, result)
 
-        return hs, name, manga_page_ocr(path)
+        return hs, name, result
     except Exception as e:
         return hs, name, {"error": str(e)}
     finally:
+        with current_app.queue_lock:
+            del current_app.queue[hs]
         # either way, when temp_file is garbage collected, it will be deleted
         temp_file.close()
