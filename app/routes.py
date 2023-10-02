@@ -49,15 +49,19 @@ def hash_check():
     if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
+    hashes = dict.fromkeys(request.json)
     with current_app.queue_lock:
-        queue = frozenset(current_app.queue)
-    new = tuple(
-        hs for hs in dict.fromkeys(request.json)
-        if (not hs.lower() in queue and
-            not current_app.extensions[PAGE_CACHE].has(hs.lower()))
-    )
+        queue = tuple(
+            hs for hs in hashes
+            if hs.lower() in current_app.queue
+        )
+        new = tuple(
+            hs for hs in hashes
+            if (hs.lower() not in current_app.queue and
+                not current_app.extensions[PAGE_CACHE].has(hs.lower()))
+        )
 
-    return {"new": new}
+    return {"new": new, "queue": queue}
 
 
 @v1.post('/ocr')

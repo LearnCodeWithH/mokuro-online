@@ -40,7 +40,7 @@ def test_hash_check_invalid_error(client, url_hash_check, app):
 def test_hash_check_empty(client, url_hash_check):
     response = client.post(url_hash_check, json=[])
     assert response.status_code == 200
-    assert response.json == {"new": []}
+    assert response.json == {"new": [], "queue": []}
 
 
 def test_hash_check_none_found(client, url_hash_check):
@@ -48,7 +48,7 @@ def test_hash_check_none_found(client, url_hash_check):
     response = client.post(url_hash_check, json=json)
 
     assert response.status_code == 200
-    assert response.json == {"new": json}
+    assert response.json == {"new": json, "queue": []}
 
 
 def test_hash_check_all_found(client, url_hash_check, cache):
@@ -59,7 +59,7 @@ def test_hash_check_all_found(client, url_hash_check, cache):
     response = client.post(url_hash_check, json=json)
 
     assert response.status_code == 200
-    assert response.json == {"new": []}
+    assert response.json == {"new": [], "queue": []}
 
 
 def test_hash_check_some_found(client, url_hash_check, cache):
@@ -73,4 +73,4 @@ def test_hash_check_some_found(client, url_hash_check, cache):
     response = client.post(url_hash_check, json=json)
 
     assert response.status_code == 200
-    assert response.json == {"new": new}
+    assert response.json == {"new": new, "queue": []}
