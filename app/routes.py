@@ -1,3 +1,4 @@
+import json
 import re
 import concurrent.futures
 import functools
@@ -5,7 +6,7 @@ import threading
 import tempfile
 from pathlib import Path, PurePath
 from hashlib import md5
-from flask import request, Blueprint, current_app, flash, get_flashed_messages
+from flask import request, Response, Blueprint, current_app, flash, get_flashed_messages, stream_with_context
 from . import PAGE_CACHE
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
@@ -36,7 +37,7 @@ def manga_page_ocr(*args, **kwargs):
     return og.mpocr(*args, **kwargs)
 
 
-@v1.post('/new-hashes')
+@v1.post('/hash_check')
 def hash_check():
     if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
@@ -65,6 +66,7 @@ def ocr():
 
 
 @v1.post('/new_pages')
+@stream_with_context
 def new_pages():
     MAX_IMAGE_SIZE = current_app.config["MAX_IMAGE_SIZE"]
     STRICT_NEW_IMAGES = current_app.config["STRICT_NEW_IMAGES"]
@@ -78,74 +80,86 @@ def new_pages():
     e_already_uploaded = "The same page was already uploaded"
     e_unnaceptable = "Ignoring new images because of unacceptable client error"
 
-    jobs = {}
+    def cflash(msg, cat):
+        flash(msg, cat)
+        return json.dumps([str(msg), str(cat)], ensure_ascii=False) + '\n'
 
-    if not request.files:
-        flash("No files were uploaded", "error")
+    def function_results():
+        jobs = {}
 
-    for file in request.files.values():
-        name = file.name
+        if not request.files:
+            yield cflash("No files were uploaded", "error")
 
-        if file.content_length and file.content_length > MAX_IMAGE_SIZE:
-            flash(e_too_large, "error")
-            continue
-        if file.mimetype and not file.mimetype.startswith("image/"):
-            flash(e_not_image, "error")
-            continue
+        for file in request.files.values():
+            name = file.name
 
-        blob = file.read()
-        flash(f'Uploaded file "{name}" successfully', "info")
+            if file.content_length and file.content_length > MAX_IMAGE_SIZE:
+                yield cflash(e_too_large, "error")
+                continue
+            if file.mimetype and not file.mimetype.startswith("image/"):
+                yield cflash(e_not_image, "error")
+                continue
 
-        if not blob:
-            flash(e_file_empty, "error")
-            continue
+            blob = file.read()
+            yield cflash(f'Uploaded file "{name}" successfully', "success")
 
-        if len(blob) > MAX_IMAGE_SIZE:
-            flash(e_too_large, "error")
-            if STRICT_NEW_IMAGES:
-                flash(e_unnaceptable, "error")
-                break
-            continue
+            if not blob:
+                yield cflash(e_file_empty, "error")
+                continue
 
-        hs = md5(blob).hexdigest()
+            if len(blob) > MAX_IMAGE_SIZE:
+                yield cflash(e_too_large, "error")
+                if STRICT_NEW_IMAGES:
+                    yield cflash(e_unnaceptable, "error")
+                    break
+                continue
 
-        if hs in jobs:
-            flash(e_already_uploaded, "error")
-            if STRICT_NEW_IMAGES:
-                flash(e_unnaceptable, "error")
-                break
-            continue
+            hs = md5(blob).hexdigest()
 
-        if current_app.extensions[PAGE_CACHE].has(hs):
-            flash(e_already_have, "error")
-            if STRICT_NEW_IMAGES:
-                flash(e_unnaceptable, "error")
-                break
-            continue
+            if hs in jobs:
+                yield cflash(e_already_uploaded, "error")
+                if STRICT_NEW_IMAGES:
+                    yield cflash(e_unnaceptable, "error")
+                    break
+                continue
 
-        temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
-        temp_file.write(blob)
-        jobs[hs] = (hs, name, temp_file)
+            if current_app.extensions[PAGE_CACHE].has(hs):
+                yield cflash(e_already_have, "error")
+                if STRICT_NEW_IMAGES:
+                    yield cflash(e_unnaceptable, "error")
+                    break
+                continue
 
-    futures = [
-        current_app.extensions["executor"].submit(do_page_ocr, *job)
-        for job in jobs.values()
-    ]
+            temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
+            temp_file.write(blob)
+            jobs[hs] = (hs, name, temp_file)
 
-    for future in concurrent.futures.as_completed(futures):
-        hs, name, result = future.result()
-        if "error" in result:
-            flash(f'Failed OCR of "{name}":' + result["error"], "info")
+        futures = [
+            current_app.extensions["executor"].submit(do_page_ocr, *job)
+            for job in jobs.values()
+        ]
+
+        for future in concurrent.futures.as_completed(futures):
+            hs, name, result = future.result()
+            if "error" in result:
+                yield cflash(f'Failed OCR of "{name}":' + result["error"], "error")
+            else:
+                yield cflash(f'Finished OCR of "{name}" successfully', "success")
+                current_app.extensions[PAGE_CACHE].set(hs, result)
+
+        if futures:
+            yield cflash(f'Finished OCR of all {len(futures)} files', "success")
         else:
-            flash(f'Finished OCR of "{name}" successfully', "info")
-            current_app.extensions[PAGE_CACHE].set(hs, result)
+            yield cflash('No files were processed', "warning")
 
-    if futures:
-        flash(f'Finished OCR of all {len(futures)} files', "info")
-    else:
-        flash('No files were processed', "info")
+    if request.args.get('stream'):
+        return Response(function_results(), content_type='application/jsonlines')
 
-    return get_flashed_messages(with_categories=True)
+    def dummy_gen():
+        for _ in function_results():
+            pass
+        return json.dumps(get_flashed_messages(with_categories=True), ensure_ascii=False)
+    return Response(dummy_gen(), content_type='application/json')
 
 
 @v1.post('/make_html')
