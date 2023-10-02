@@ -5,6 +5,7 @@ from .config import DevelopmentConfig
 
 PAGE_CACHE = "page_cache"
 
+
 def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__)
 
@@ -19,5 +20,6 @@ def create_app(config_class=DevelopmentConfig):
 
     from app import routes
     app.register_blueprint(routes.v1)
+    app.register_blueprint(routes.site)
 
     return app

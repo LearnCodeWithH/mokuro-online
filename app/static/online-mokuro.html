@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Mokuro</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <style>
+        /* Custom CSS for styling */
+        .log-area {
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+          integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"
+            integrity="sha512-iWbxiCA4l1WTD0rRctt/BfDEmDC5PiVqFc6c1Rhj/GKjuj6tqrjrikTw3Sypm/eEgMa7jSOS9ydmDlOtxJKlSQ=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+            integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title has-text-centered">Online Mokuro</h1>
+
+            <div class="columns">
+                <div class="column">
+                    <div class="block">
+                        <div class="file has-name">
+                            <label class="file-label">
+                                <input class="file-input" type="file" name="directory" id="directoryInput"
+                                       webkitdirectory directory>
+                                <span class="file-cta">
+                                    <span class="file-icon"><i class="fas fa-upload"></i></span>
+                                    <span class="file-label">Choose a directory…</span>
+                                </span>
+                                <span class="file-name" id="selectedDirectory">No directory selected</span>
+                            </label>
+                        </div>
+
+                    </div>
+
+                    <div class="block">
+                        <table class="table is-hoverable is-fullwidth">
+                            <tbody id="jobTBody"></tbody>
+                        </table>
+                    </div>
+
+                </div>
+                <div class="column">
+                    <div class="buttons">
+                        <button class="button is-danger is-inverted"
+                                id="clearLogsButton">Clear Logs</button>
+                    </div>
+
+                    <div class="block" id="logArea"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- <hr class="is-divider" data-content="OR"> -->
+
+
+    </section>
+
+    <div id="textModal" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-card" style="height: 100%;">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Generated Text</p>
+                <button class="delete" aria-label="close"></button>
+            </header>
+            <section class="modal-card-body">
+                <textarea class="textarea has-fixed-size" style="height: 100%;" readonly></textarea>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="bntDlTXT button is-success" onclick="bntDlTXTClick(event)"
+                        aria-label="Download Text" title="Download Text">
+                    <span class="icon"><i class="fas fa-lg fa-file-arrow-down"></i></span>
+                </button>
+                <button class="bntCopyTXT button is-success" onclick="bntCopyTXTClick(event)"
+                        aria-label="Copy Text" title="Copy Text"
+                        data-tooltip="Click to Copy" data-tooltip-multiline="true">
+                    <span class="icon"><i class="fas fa-lg fa-copy"></i></span>
+                </button>
+                <label class="checkbox">
+                    <input type="checkbox" id="includeTitles">
+                    Include file Titles
+                </label>
+            </footer>
+        </div>
+    </div>
+
+    <table id="jobRowTemplate" style="display: none;">
+        <tbody>
+            <tr>
+                <td>
+                    <div class="columns is-flex-direction-row-reverse">
+                        <div class="column">
+                            <div class="content">
+                                <b class="rowTitle">Chapter 2: A Very Long Title Can Fit Here</b>
+                                <p class="rowHelp help">35 Pages | 12.4MB</p>
+                            </div>
+                        </div>
+                        <div class="buttonsColumn column is-narrow">
+                            <div class="btnsDownloads buttons has-addons is-hidden">
+                                <button class="bntDlHTML button is-success" onclick="bntDlHTMLClick(event)"
+                                        aria-label="Download HTML" title="Download HTML">
+                                    <span class="icon"><i class="fas fa-lg fa-file-code"></i></span>
+                                </button>
+                                <button class="bntDlOCR button is-success" onclick="bntDlOCRClick(event)"
+                                        aria-label="Download OCR" title="Download OCR">
+                                    <span class="icon"><i class="fas fa-lg fa-box-archive"></i></span>
+                                </button>
+                                <button class="bntOpenTXT button is-success" onclick="bntOpenTXTClick(event)"
+                                        aria-label="See Text Generated" title="See Text Generated">
+                                    <span class="icon"><i class="fas fa-lg fa-file-alt"></i></span>
+                                </button>
+                            </div>
+                            <div class="btnsPrepare buttons has-addons">
+                                <button class="btnPlay button is-primary" onclick="btnPlayClick(event)"
+                                        aria-label="Start" title="Start">
+                                    <span class="icon"><i class="fas fa-lg fa-play"></i></span>
+                                </button>
+                                <button class="btnHash button is-info"
+                                        disabled aria-label="Hash" title="Hash">
+                                    <span class="icon"><i class="fas fa-lg fa-fingerprint"></i></span>
+                                </button>
+                                <button class="btnUpload button is-info"
+                                        disabled aria-label="Upload" title="Upload">
+                                    <span class="icon"><i class="fas fa-lg fa-cloud-upload-alt"></i></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+
+        async function imageHash(file) {
+            const buffer = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                // TODO: add more descriptive errors
+                reader.onerror = (ev) => reject(ev.target.error.message);
+                reader.readAsArrayBuffer(file);
+            });
+            return SparkMD5.ArrayBuffer.hash(buffer)
+        }
+
+        async function imageHashCached(file) {
+            if (file.md5sum) return file.md5sum
+            file.md5sum = await imageHash(file)
+            return file.md5sum
+        }
+
+        async function hashImages(images, hasher = imageHashCached) {
+            const errors = []
+            const result = (await Promise.all(
+                Array.from(images).map(async (f) => {
+                    try {
+                        return [await hasher(f)];
+                    } catch (e) {
+                        errors.push([f, e]);
+                        return []
+                    }
+                }))).flat()
+            return [result, errors]
+        }
+
+        async function throwJsonError(res) {
+            let data = {}
+            try { data = await res.json() } catch (e) {
+                if (!res.ok) throw `${res.statusText} (${res.status})`
+                if (!text) throw "Received empty body"
+                throw e
+            }
+            if (data.error) throw data.error
+            return data
+        }
+
+        async function doHashCheck(hashes, url = 'v1/hash_check') {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', },
+                body: JSON.stringify(Array.from(hashes)),
+            });
+            return await throwJsonError(res)
+        }
+
+        async function doOCR(hashes, url = 'v1/ocr') {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', },
+                body: JSON.stringify(Array.from(hashes)),
+            });
+            return await throwJsonError(res)
+        }
+
+        async function doNewPages(new_files, url = 'v1/new_pages') {
+            const form = new FormData();
+            for (const file of new_files) {
+                form.append(file.webkitRelativePath, file, file.name)
+            }
+            const res = await fetch(url, { method: 'POST', body: form });
+            return await throwJsonError(res)
+        }
+
+        async function doNewPagesStream(new_files, url = 'v1/new_pages?stream=1') {
+            const form = new FormData();
+            for (const file of new_files) {
+                form.append(file.webkitRelativePath, file, file.name)
+            }
+
+            const res = await fetch(url, { method: 'POST', body: form, credentials: "omit" });
+            return res.body
+                .pipeThrough(new TextDecoderStream())
+                .pipeThrough(new TransformStream(new JSONLTransformer()))
+        }
+
+        async function doMakeHTML(title, page_map) {
+            const res = await fetch('v1/make_html', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', },
+                body: JSON.stringify({ title, page_map }),
+            });
+
+            const text = await res.text();
+
+            let data = {}
+            try { data = JSON.parse(text) } catch (e) { }
+            if (data.error) throw data.error
+            if (!res.ok) throw `${res.statusText} (${res.status})`
+            if (!text) throw "Received empty body"
+
+            return text
+        }
+
+        class JSONLTransformer {
+            constructor() {
+                this.buffer = '';
+            }
+
+            async transform(chunk, controller) {
+                this.buffer += chunk;
+                let newlineIndex;
+                while ((newlineIndex = this.buffer.indexOf('\n')) !== -1) {
+                    const line = this.buffer.substring(0, newlineIndex + 1);
+                    this.buffer = this.buffer.substring(newlineIndex + 1);
+                    try {
+                        controller.enqueue(JSON.parse(line));
+                    } catch (e) {
+                        console.error(`Error parsing JSON: ${e.message}`);
+                    }
+                }
+            }
+
+            flush(controller) {
+                if (this.buffer.length > 0) {
+                    controller.enqueue(this.buffer);
+                    this.buffer = '';
+                }
+            }
+        }
+
+    </script>
+
+    <script>
+        const supportedExtensions = ["jpg", "jpeg", "png", "webp"]
+        function isImage(file) {
+            return supportedExtensions.includes(file.name.split(".").at(-1).toLowerCase())
+        }
+        function filesAsImages(files) {
+            return Array.from(files)
+                .filter((f) => isImage(f))
+                .sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+        }
+        function filesTotalSize(files) {
+            return Array.from(files).reduce((acc, cur) => acc + cur.size, 0)
+        }
+        function subdirImages(images) {
+            const dirs = new Set(images
+                .filter((f) => f.webkitRelativePath.split("/").length > 2) // only folders
+                .map((f) => f.webkitRelativePath.split("/")[1])
+            );
+
+            const result = {}
+            for (const subdir of dirs) {
+                result[subdir] = images.filter((f) => f.webkitRelativePath.split("/")[1] == subdir);
+            }
+            return result
+        }
+
+
+        ////////////////
+
+        function spawnNotif(box, category, message, progressMax = 0) {
+            const categories = {
+                "error": "is-danger",
+                "info": "is-info",
+                "success": "is-success",
+                "warning": "is-warning",
+                "warn": "is-warning",
+                "primary": "is-primary",
+            }
+
+            const notif = document.createElement("div");
+            notif.classList.add("notification", "is-light");
+            notif.innerHTML = '<button class="delete" onclick="this.parentElement.remove()"></button>';
+
+            const progress = document.createElement('progress');
+            progress.classList.add('progress', "is-light");
+            progress.textContent = 'Loading';
+
+            const msgBlock = document.createElement('div');
+            msgBlock.classList.add('block', 'content');
+
+            const progBlock = document.createElement('div');
+            progBlock.classList.add('block');
+            progBlock.appendChild(progress)
+
+            notif.append(msgBlock);
+            if (progressMax) {
+                notif.appendChild(progBlock);
+            }
+
+            notif.msgBlock = msgBlock
+            notif.progBlock = progBlock
+            notif.progress = progress
+            Object.defineProperties(notif, {
+                category: {
+                    get() {
+                        return notif._category;
+                    },
+                    set(cat) {
+                        notif._category = categories[cat] || "is-primary"
+                        notif.classList.remove(...Object.values(categories));
+                        progress.classList.remove(...Object.values(categories));
+                        notif.classList.add(notif._category);
+                        progress.classList.add(notif._category);
+                    },
+                },
+                message: {
+                    get() {
+                        return msgBlock.innerHTML;
+                    },
+                    set(msg) {
+                        msgBlock.innerHTML = msg;
+                    },
+                },
+                barValue: {
+                    get() {
+                        return progress.value;
+                    },
+                    set(val) {
+                        progress.value = val;
+                        progress.textContent = `${Math.round(100 * val / progress.max)}%`;
+                    },
+                },
+                barMax: {
+                    get() {
+                        return progress.max;
+                    },
+                    set(val) {
+                        progress.max = val;
+                        if (val && !notif.contains(progBlock)) {
+                            notif.appendChild(progBlock);
+                        } else if (!val && notif.contains(progBlock)) {
+                            notif.removeChild(progBlock);
+                        }
+                    },
+                }
+            });
+
+            notif.category = category
+            notif.message = message
+            notif.barMax = progressMax
+
+            box.appendChild(notif);
+
+            return notif
+        }
+
+        function spawnTextNotif(box, category, message) {
+            const categories = {
+                "error": ["has-text-danger", "fa-ban"],
+                "info": ["has-text-info", "fa-info-circle"],
+                "success": ["has-text-success", "fa-check-square"],
+                "warning": ["has-text-warning", "fa-exclamation-triangle"],
+                "warn": ["has-text-warning", "fa-exclamation-triangle"],
+                "primary": ["has-text-success", "fa-check-square"],
+            }
+
+            const notif = document.createElement("div");
+            notif.classList.add("icon-text", "block");
+
+            const iconEl = document.createElement("i");
+            iconEl.classList.add("fas");
+
+            const iconSpan = document.createElement("span");
+            iconSpan.classList.add("icon");
+
+            const msgSpan = document.createElement("span");
+
+            iconSpan.appendChild(iconEl)
+            notif.appendChild(iconSpan)
+            notif.appendChild(msgSpan)
+
+            notif.iconEl = iconEl
+            notif.iconSpan = iconSpan
+            notif.msgSpan = msgSpan
+
+            Object.defineProperties(notif, {
+                category: {
+                    get() {
+                        return notif._category;
+                    },
+                    set(cat) {
+                        const newClasses = categories[cat]
+                        if (!newClasses) return
+                        notif._category = cat
+                        const [color, icon] = newClasses
+
+                        notif.classList.remove(...Object.values(categories).map(c => c[0]));
+                        iconEl.classList.remove(...Object.values(categories).map(c => c[1]));
+
+                        notif.classList.add(color);
+                        iconEl.classList.add(icon);
+                    },
+                },
+                message: {
+                    get() {
+                        return msgSpan.innerHTML;
+                    },
+                    set(msg) {
+                        msgSpan.innerHTML = msg;
+                    },
+                },
+            });
+
+            notif.category = category
+            notif.message = message
+
+            box.appendChild(notif);
+
+            return notif
+        }
+
+        function createProgress() {
+            const progress = document.createElement('progress');
+            progress.classList.add('progress');
+            progress.textContent = 'Loading';
+            progress.indeterminate = function () {
+                progress.textContent = 'Loading';
+                progress.removeAttribute("value");
+            }
+
+            Object.defineProperties(progress, {
+                barValue: {
+                    get() { return progress.value; },
+                    set(val) {
+                        progress.value = val;
+                        progress.textContent = `${Math.round(100 * val / progress.max)}%`;
+                    },
+                },
+                barMax: {
+                    get() { return progress.max; },
+                    set(val) { progress.max = val; },
+                }
+            });
+
+            return progress
+        }
+
+        ////////////////
+
+        function clearLogs() {
+            document.getElementById('logArea').innerHTML = '';
+        }
+
+        function directoryChanged() {
+            const files = document.getElementById('directoryInput').files;
+
+            const selectedDir = files.length == 0 ? 'No directory selected' : files[0].webkitRelativePath.split("/")[0];
+            document.getElementById('selectedDirectory').textContent = selectedDir;
+
+            const images = filesAsImages(files);
+
+            const jobTBody = document.getElementById('jobTBody');
+            const jobRowTemplate = document.querySelector('#jobRowTemplate tbody tr');
+            jobTBody.innerHTML = "" // delete everything
+
+            if (!images.length) return
+
+            const row = jobRowTemplate.cloneNode(true);
+            row.querySelector(".rowTitle").textContent = selectedDir.trim()
+            row.querySelector(".rowHelp").textContent = `${images.length} Page links`
+            row.querySelector(".columns").processData = { selectedDir, images, hashes: [] }
+            jobTBody.appendChild(row);
+
+            for (const [subdir, subdir_imgs] of Object.entries(subdirImages(images))) {
+                const row = jobRowTemplate.cloneNode(true);
+                row.querySelector(".rowTitle").textContent = subdir.trim()
+                row.querySelector(".rowHelp").textContent = `${subdir_imgs.length} Page links`
+                row.querySelector(".columns").processData = { selectedDir: subdir, images: subdir_imgs, hashes: [] }
+                jobTBody.appendChild(row);
+            }
+
+        }
+
+        async function btnPlayClick(event) {
+            const btn = event.target.closest("button");
+            btn.classList.toggle("is-loading", true)
+            btn.disabled = true
+            const logArea = document.getElementById("logArea")
+
+            try {
+                const row = event.target.closest(".columns")
+                const btnHash = row.querySelector(".btnHash")
+                const btnUpload = row.querySelector(".btnUpload")
+                const { selectedDir, images, hashes } = row.processData
+
+                // Get all image hashes
+                if (!hashes.length) {
+                    btnHash.classList.toggle("is-loading", true)
+
+                    const [_hashes, hash_errors] = await hashImages(images)
+                    if (hash_errors.length > 0) {
+                        btnHash.classList.toggle("is-loading", false)
+                        btnHash.classList.toggle("is-danger", true)
+
+                        const ul = document.createElement("ul");
+                        for (const [f, e] of hash_errors) {
+                            console.error(e)
+                            const li = document.createElement("li");
+                            li.innerHTML = `<b>${f.name}</b>: ${e}`;
+                            ul.appendChild(li);
+                        }
+
+                        throw `Failed the hashing of <b>${hash_errors.length}</b> (of <b>${images.length}</b>) images:` + ul.outerHTML;
+                        return
+                    }
+
+                    hashes.push(..._hashes)
+
+                    btnHash.classList.toggle("is-loading", false)
+                    btnHash.classList.toggle("is-success", true)
+                }
+
+                // Uploading new images
+                btnUpload.classList.toggle("is-loading", true)
+
+                const newFiles = []
+
+                try {
+                    const data = await doHashCheck(hashes);
+                    newFiles.push(...data.new.map(hs => images[hashes.findIndex((_hs) => _hs == hs)]))
+                } catch (e) {
+                    btnUpload.classList.toggle("is-loading", false)
+                    btnUpload.classList.toggle("is-danger", true)
+                    throw "Failed receiving list of missing images: " + e;
+                }
+
+                if (newFiles.length) {
+
+                    const mb = (filesTotalSize(newFiles) / 1000 / 1000).toFixed(2)
+                    const notif = spawnNotif(logArea, "info", `<p>Uploading <b>${newFiles.length} new images</b>, <b>${mb}MB</b> of data in total.</p><p class="help"></p>`,
+                        newFiles.length * 2 // upload + OCR
+                    )
+                    const help = notif.msgBlock.querySelector(".help")
+
+                    notif.barValue = 0;
+
+                    try {
+                        const stream = await doNewPagesStream(newFiles)
+                        await stream.pipeTo(new WritableStream({
+                            async write(chunk) {
+                                console.log(chunk)
+                                if (chunk[1] == "success") {
+                                    notif.barValue += 1;
+                                } else {
+                                    spawnNotif(logArea, chunk[1], chunk[0])
+                                }
+                                help.textContent = chunk[0];
+                                help.className = "help is-" + chunk[1];
+                            },
+                        }));
+
+                    } catch (e) {
+                        btnUpload.classList.toggle("is-loading", false)
+                        btnUpload.classList.toggle("is-danger", true)
+                        throw "Failed to upload files: " + e;
+                    }
+
+                    notif.barValue = notif.barMax;
+                    notif.category = "success"
+                }
+
+                btnUpload.classList.toggle("is-loading", false)
+                btnUpload.classList.toggle("is-success", true)
+
+                // await new Promise(resolve => setTimeout(resolve, 200));
+
+                completeUpload(row)
+                row.processData.done = true
+                await checkIntersections()
+
+
+            } catch (e) {
+                console.error(e)
+                spawnNotif(logArea, "error", "" + e)
+            } finally {
+                btn.classList.toggle("is-loading", false)
+                btn.disabled = false
+            }
+        }
+
+        async function bntDlHTMLClick(event) {
+            const btn = event.target.closest("button");
+            btn.classList.toggle("is-loading", true)
+            btn.disabled = true
+            const logArea = document.getElementById("logArea")
+
+            try {
+                const row = event.target.closest(".columns")
+                const { selectedDir, images, hashes } = row.processData
+
+                const title = selectedDir;
+                const page_map = Array.from(images.entries())
+                    .map(([i, f]) => [
+                        f.webkitRelativePath.substring(f.webkitRelativePath.indexOf(selectedDir)),
+                        hashes[i]
+                    ]);
+
+                const html = await doMakeHTML(title, page_map)
+
+                const url = window.URL.createObjectURL(new Blob([html], { type: "text/html" }));
+                setTimeout(() => window.URL.revokeObjectURL(url), 5 * 60 * 1000)
+
+                const a = document.createElement("a")
+                a.href = url
+                a.download = selectedDir + '.html';
+                a.click()
+
+            } catch (e) {
+                spawnNotif(logArea, "error", "Failed to generate HTML file: " + e)
+                throw e
+            } finally {
+                btn.classList.toggle("is-loading", false)
+                btn.disabled = false
+            }
+        }
+
+        async function bntDlOCRClick(event) {
+            const btn = event.target.closest("button");
+            btn.classList.toggle("is-loading", true)
+            btn.disabled = true
+            const logArea = document.getElementById("logArea")
+
+            try {
+                const row = event.target.closest(".columns")
+                const { selectedDir, images, hashes } = row.processData
+
+                let ocr = row.processData.ocr
+                if (!ocr) {
+                    const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
+
+                    if (new_hashes.length) {
+                        spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
+                    } else {
+                        row.processData.ocr = _ocr
+                    }
+                    ocr = _ocr;
+                }
+
+
+                const zip = new JSZip();
+
+                for (const i in images) {
+                    const f = images[i]
+                    const ocr_content = ocr[hashes[i]]
+                    if (!ocr_content) continue
+
+                    const file_name = f.webkitRelativePath.substring(
+                        f.webkitRelativePath.indexOf(selectedDir),
+                        f.webkitRelativePath.lastIndexOf(".")
+                    ) + ".json";
+
+                    zip.file(file_name, JSON.stringify(ocr_content));
+                }
+
+                const zipFile = await zip.generateAsync({ type: "blob" })
+                const url = window.URL.createObjectURL(zipFile, { type: "text/html" });
+                setTimeout(() => window.URL.revokeObjectURL(url), 5 * 60 * 1000)
+
+                const a = document.createElement("a")
+                a.href = url
+                a.download = selectedDir + '.zip';
+                a.click()
+
+            } catch (e) {
+                spawnNotif(logArea, "error", "Failed to get OCR file: " + e)
+                throw e
+            } finally {
+                btn.classList.toggle("is-loading", false)
+                btn.disabled = false
+            }
+        }
+
+        async function bntOpenTXTClick(event) {
+            const btn = event.target.closest("button");
+            const logArea = document.getElementById("logArea")
+
+            try {
+                const row = event.target.closest(".columns")
+                const { selectedDir, images, hashes } = row.processData
+
+                let ocr = row.processData.ocr
+                if (!ocr) {
+                    const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
+                    ocr = _ocr;
+
+                    if (new_hashes.length) {
+                        spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
+                    } else {
+                        row.processData.ocr = ocr
+                    }
+                }
+
+                const textModal = document.getElementById('textModal');
+                textModal.querySelector(".modal-card-title").textContent = selectedDir
+                textModal.row = row
+                await updateTextArea()
+                textModal.classList.toggle('is-active', true);
+
+            } catch (e) {
+                spawnNotif(logArea, "error", "Failed to get OCR file: " + e)
+                throw e
+            }
+        }
+
+        async function bntDlTXTClick(event) {
+            const textModal = document.getElementById('textModal');
+            const selectedDir = textModal.querySelector(".modal-card-title").textContent;
+            const text = textModal.querySelector("textarea").textContent;
+
+            const url = window.URL.createObjectURL(new Blob([text]));
+            setTimeout(() => window.URL.revokeObjectURL(url), 5 * 60 * 1000)
+
+            const a = document.createElement("a")
+            a.href = url
+            a.download = selectedDir + '.txt';
+            a.click()
+        }
+
+        async function bntCopyTXTClick(event) {
+            const textarea = document.getElementById('textModal').querySelector("textarea");
+            textarea.select()
+            document.execCommand('copy');
+        }
+
+        async function updateTextArea() {
+            const textModal = document.getElementById('textModal');
+            if (!textModal.row) throw "No row set-up yet available"
+            const includeTitles = document.getElementById("includeTitles");
+
+            const { selectedDir, images, hashes, ocr } = textModal.row.processData
+
+            let textResult = ""
+
+            for (const i in images) {
+                const f = images[i]
+                const ocr_content = ocr[hashes[i]]
+                if (!ocr_content) continue;
+
+                if (includeTitles.checked) {
+                    const file_name = f.webkitRelativePath.substring(
+                        f.webkitRelativePath.indexOf(selectedDir) + selectedDir.length + 1
+                    );
+                    if (textResult) textResult += "\n";
+                    textResult += "# " + file_name + "\n\n";
+                }
+
+                textResult += Array.from(ocr_content.blocks || [])
+                    .map(block => block.lines.join(""))
+                    .join("\n") + "\n";
+            }
+
+            textModal.querySelector("textarea").value = textResult;
+        }
+
+        function completeUpload(row) {
+            const btnsDownloads = row.querySelector(".btnsDownloads")
+            const btnsPrepare = row.querySelector(".btnsPrepare")
+
+            // move btns down because of "block" margin...
+            btnsDownloads.remove()
+            row.querySelector(".buttonsColumn").appendChild(btnsDownloads)
+
+            btnsPrepare.closest(".buttons").classList.toggle("is-hidden", true)
+            btnsDownloads.classList.toggle("is-hidden", false)
+        }
+
+        async function checkIntersections() {
+            // Check if any other rows share all hashmaps
+            const columns = document.getElementById('jobTBody').querySelectorAll(".columns")
+
+            // If the first is done or all except the first is done
+            if (columns[0].processData.done) {
+                for (const row of Array.from(columns).slice(1)) {
+                    await completeRow(row)
+                }
+            } else if (Array.from(columns).slice(1).every((row) => row.processData.done)) {
+                await completeRow(columns[0])
+            }
+
+            async function completeRow(row) {
+                if (!row.processData.hashes.length) {
+                    // Only works because of "cached" hashImages
+                    // should be done in a way independent from it
+                    row.processData.hashes = (await hashImages(row.processData.images))[0]
+                }
+                row.processData.done = true
+                completeUpload(row)
+            }
+        }
+
+        document.getElementById('directoryInput').addEventListener('change', directoryChanged);
+        document.getElementById("includeTitles").addEventListener('change', updateTextArea);
+        document.getElementById('clearLogsButton').addEventListener('click', clearLogs);
+
+        // Add a click event on various child elements to close the parent modal
+        (document.querySelectorAll('.modal-background, .modal-close, .modal-card-head .delete') || []).forEach((close) => {
+            const modal = close.closest('.modal');
+            close.addEventListener('click', () => {
+                modal.classList.toggle('is-active', false);
+            })
+        });
+
+        // Add a keyboard event to close all modals
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Escape') {
+                (document.querySelectorAll('.modal') || []).forEach((modal) => {
+                    modal.classList.toggle('is-active', false);
+                })
+            }
+        });
+
+        directoryChanged();
+    </script>
+
+</body>
+
+</html>

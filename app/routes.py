@@ -10,6 +10,7 @@ from flask import request, Response, Blueprint, current_app, flash, get_flashed_
 from . import PAGE_CACHE
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
+site = Blueprint('site', __name__)
 hash_reg = re.compile("[a-f0-9]{32}")
 _og_lock = threading.Lock()
 
@@ -35,6 +36,11 @@ def manga_page_ocr(*args, **kwargs):
             # This take way too long to init
             og.init_models()
     return og.mpocr(*args, **kwargs)
+
+
+@site.get('/online-mokuro')
+def online_mokuro():
+    return current_app.send_static_file('online-mokuro.html')
 
 
 @v1.post('/hash_check')
