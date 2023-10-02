@@ -4,6 +4,7 @@ import concurrent.futures
 import functools
 import threading
 import tempfile
+from functools import wraps
 from pathlib import Path, PurePath
 from hashlib import md5
 from flask import request, Response, Blueprint, current_app, flash, get_flashed_messages, stream_with_context
@@ -71,8 +72,26 @@ def ocr():
     return {"ocr": ocr, "new": new}
 
 
+def flashes_or_jsonlstream():
+    def decorator(func):
+        @wraps(func)
+        def decorated_function(*args, **kwargs):
+            if request.args.get('stream'):
+                return Response(func(*args, **kwargs), content_type='application/jsonlines')
+
+            def dummy_gen():
+                for _ in func(*args, **kwargs):
+                    pass
+                return json.dumps(get_flashed_messages(with_categories=True), ensure_ascii=False)
+
+            return Response(dummy_gen(), content_type='application/json')
+        return decorated_function
+    return decorator
+
+
 @v1.post('/new_pages')
 @stream_with_context
+@flashes_or_jsonlstream()
 def new_pages():
     MAX_IMAGE_SIZE = current_app.config["MAX_IMAGE_SIZE"]
     STRICT_NEW_IMAGES = current_app.config["STRICT_NEW_IMAGES"]
@@ -91,83 +110,73 @@ def new_pages():
         flash(msg, cat)
         return json.dumps([str(msg), str(cat)], ensure_ascii=False) + '\n'
 
-    def function_results():
-        jobs = {}
+    jobs = {}
 
-        if not request.files:
-            yield cflash("No files were uploaded", "error")
+    if not request.files:
+        yield cflash("No files were uploaded", "error")
 
-        for hs, file in request.files.items():
-            hs = hs.lower()
-            name = file.filename
+    for hs, file in request.files.items():
+        hs = hs.lower()
+        name = file.filename
 
-            if not hash_reg.fullmatch(hs):
-                yield cflash(e_key_not_hash, "error")
-                continue
+        if not hash_reg.fullmatch(hs):
+            yield cflash(e_key_not_hash, "error")
+            continue
 
-            if current_app.extensions[PAGE_CACHE].has(hs):
-                yield cflash(e_already_have, "error")
-                continue
+        if current_app.extensions[PAGE_CACHE].has(hs):
+            yield cflash(e_already_have, "error")
+            continue
 
-            if file.content_length and file.content_length > MAX_IMAGE_SIZE:
-                yield cflash(e_too_large, "error")
-                continue
+        if file.content_length and file.content_length > MAX_IMAGE_SIZE:
+            yield cflash(e_too_large, "error")
+            continue
 
-            if file.mimetype and not file.mimetype.startswith("image/"):
-                yield cflash(e_not_image, "error")
-                continue
+        if file.mimetype and not file.mimetype.startswith("image/"):
+            yield cflash(e_not_image, "error")
+            continue
 
-            blob = file.read()
+        blob = file.read()
 
-            if not blob:
-                yield cflash(e_file_empty, "error")
-                continue
+        if not blob:
+            yield cflash(e_file_empty, "error")
+            continue
 
-            if len(blob) > MAX_IMAGE_SIZE:
-                yield cflash(e_too_large, "error")
-                if STRICT_NEW_IMAGES:
-                    yield cflash(e_unnaceptable, "error")
-                    break
-                continue
+        if len(blob) > MAX_IMAGE_SIZE:
+            yield cflash(e_too_large, "error")
+            if STRICT_NEW_IMAGES:
+                yield cflash(e_unnaceptable, "error")
+                break
+            continue
 
-            if hs != md5(blob).hexdigest():
-                yield cflash(e_hash_no_match, "error")
-                if STRICT_NEW_IMAGES:
-                    yield cflash(e_unnaceptable, "error")
-                    break
-                continue
+        if hs != md5(blob).hexdigest():
+            yield cflash(e_hash_no_match, "error")
+            if STRICT_NEW_IMAGES:
+                yield cflash(e_unnaceptable, "error")
+                break
+            continue
 
-            temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
-            temp_file.write(blob)
-            jobs[hs] = (hs, name, temp_file)
-            yield cflash(f'Uploaded file "{name}" successfully', "success")
+        temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
+        temp_file.write(blob)
+        jobs[hs] = (hs, name, temp_file)
+        yield cflash(f'Uploaded file "{name}" successfully', "success")
 
-        futures = [
-            current_app.extensions["executor"].submit(do_page_ocr, *job)
-            for job in jobs.values()
-        ]
+    futures = [
+        current_app.extensions["executor"].submit(do_page_ocr, *job)
+        for job in jobs.values()
+    ]
 
-        for future in concurrent.futures.as_completed(futures):
-            hs, name, result = future.result()
-            if "error" in result:
-                yield cflash(f'Failed OCR of "{name}":' + result["error"], "error")
-            else:
-                yield cflash(f'Finished OCR of "{name}" successfully', "success")
-                current_app.extensions[PAGE_CACHE].set(hs, result)
-
-        if futures:
-            yield cflash(f'Finished OCR of all {len(futures)} files', "success")
+    for future in concurrent.futures.as_completed(futures):
+        hs, name, result = future.result()
+        if "error" in result:
+            yield cflash(f'Failed OCR of "{name}":' + result["error"], "error")
         else:
-            yield cflash('No files were processed', "warning")
+            yield cflash(f'Finished OCR of "{name}" successfully', "success")
+            current_app.extensions[PAGE_CACHE].set(hs, result)
 
-    if request.args.get('stream'):
-        return Response(function_results(), content_type='application/jsonlines')
-
-    def dummy_gen():
-        for _ in function_results():
-            pass
-        return json.dumps(get_flashed_messages(with_categories=True), ensure_ascii=False)
-    return Response(dummy_gen(), content_type='application/json')
+    if futures:
+        yield cflash(f'Finished OCR of all {len(futures)} files', "success")
+    else:
+        yield cflash('No files were processed', "warning")
 
 
 @v1.post('/make_html')
