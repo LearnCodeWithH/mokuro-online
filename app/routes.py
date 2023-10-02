@@ -77,13 +77,14 @@ def new_pages():
     MAX_IMAGE_SIZE = current_app.config["MAX_IMAGE_SIZE"]
     STRICT_NEW_IMAGES = current_app.config["STRICT_NEW_IMAGES"]
 
-    # TODO: improve flashing images to include file name
+    # TODO: improve flashing messages to include file name
 
     e_too_large = f"File size is too large. At most {MAX_IMAGE_SIZE} bytes are accepted"
     e_file_empty = "Empty file was uploaded"
+    e_key_not_hash = "File form key is not a valid hash"
+    e_hash_no_match = "File form hash given is not the same hash as the file"
     e_not_image = "Files need to be images"
     e_already_have = "We already have the page in cache"
-    e_already_uploaded = "The same page was already uploaded"
     e_unnaceptable = "Ignoring new images because of unacceptable client error"
 
     def cflash(msg, cat):
@@ -96,18 +97,27 @@ def new_pages():
         if not request.files:
             yield cflash("No files were uploaded", "error")
 
-        for file in request.files.values():
-            name = file.name
+        for hs, file in request.files.items():
+            hs = hs.lower()
+            name = file.filename
+
+            if not hash_reg.fullmatch(hs):
+                yield cflash(e_key_not_hash, "error")
+                continue
+
+            if current_app.extensions[PAGE_CACHE].has(hs):
+                yield cflash(e_already_have, "error")
+                continue
 
             if file.content_length and file.content_length > MAX_IMAGE_SIZE:
                 yield cflash(e_too_large, "error")
                 continue
+
             if file.mimetype and not file.mimetype.startswith("image/"):
                 yield cflash(e_not_image, "error")
                 continue
 
             blob = file.read()
-            yield cflash(f'Uploaded file "{name}" successfully', "success")
 
             if not blob:
                 yield cflash(e_file_empty, "error")
@@ -120,17 +130,8 @@ def new_pages():
                     break
                 continue
 
-            hs = md5(blob).hexdigest()
-
-            if hs in jobs:
-                yield cflash(e_already_uploaded, "error")
-                if STRICT_NEW_IMAGES:
-                    yield cflash(e_unnaceptable, "error")
-                    break
-                continue
-
-            if current_app.extensions[PAGE_CACHE].has(hs):
-                yield cflash(e_already_have, "error")
+            if hs != md5(blob).hexdigest():
+                yield cflash(e_hash_no_match, "error")
                 if STRICT_NEW_IMAGES:
                     yield cflash(e_unnaceptable, "error")
                     break
@@ -139,6 +140,7 @@ def new_pages():
             temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
             temp_file.write(blob)
             jobs[hs] = (hs, name, temp_file)
+            yield cflash(f'Uploaded file "{name}" successfully', "success")
 
         futures = [
             current_app.extensions["executor"].submit(do_page_ocr, *job)

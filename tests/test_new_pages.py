@@ -20,19 +20,6 @@ def test_files_exist():
     assert p2.exists()
 
 
-def test_ocr_works_page1():
-    result = manga_page_ocr(p1)
-    assert "blocks" in result
-    assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
-
-
-def test_ocr_works_page2():
-    result = manga_page_ocr(p2)
-    # sometimes it finds something that is not text, like "・"
-    assert "blocks" in result
-    assert 3 > len("".join(flat_map(lambda b: b['lines'], result["blocks"])))
-
-
 def test_new_pages_error_no_files(client, url_new_pages):
     res = client.post(url_new_pages, data={})
     assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
@@ -41,7 +28,7 @@ def test_new_pages_error_no_files(client, url_new_pages):
 
 
 def test_new_pages_error_empty_file(client, url_new_pages):
-    data = {"file.png": (io.BytesIO(b""), "file.png", "image/png")}
+    data = {f"{1:032}": (io.BytesIO(b""), "file.png", "image/png")}
     res = client.post(url_new_pages, data=data)
     assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
     error = next((msg for msg in res.json if msg[0] == "error"), None)
@@ -50,7 +37,7 @@ def test_new_pages_error_empty_file(client, url_new_pages):
 
 def test_new_pages_error_large_file(client, url_new_pages, app):
     app.config.update(MAX_IMAGE_SIZE=5)
-    data = {"file.png": (io.BytesIO(b"123456789"), "file.png", "image/png")}
+    data = {f"{1:032}": (io.BytesIO(b"123456789"), "file.png", "image/png")}
     res = client.post(url_new_pages, data=data)
     assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
     error = next((msg for msg in res.json if msg[0] == "error"), None)
@@ -58,97 +45,71 @@ def test_new_pages_error_large_file(client, url_new_pages, app):
 
 
 def test_new_pages_error_not_image(client, url_new_pages):
-    data = {"file.html": (io.BytesIO(b"123456789"), "file.html", "text/html")}
+    data = {f"{1:032}": (io.BytesIO(b"123456789"), "file.html", "text/html")}
     res = client.post(url_new_pages, data=data)
     assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
     error = next((msg for msg in res.json if msg[0] == "error"), None)
     assert "image" in error[1].lower()
 
 
+def test_new_pages_error_key_not_hash(client, url_new_pages, cache, app):
+    data = {"INVALID_HASH": (p1.open("rb"), p1.name)}
+    res = client.post(url_new_pages, data=data)
+
+    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
+    error = next((msg for msg in res.json if msg[0] == "error"), None)
+    assert "key" in error[1].lower()
+    assert "hash" in error[1].lower()
+
+
+def test_new_pages_error_hash_no_match(client, url_new_pages, cache, app):
+    data = {f"{1:032}": (p1.open("rb"), p1.name)}
+    res = client.post(url_new_pages, data=data)
+
+    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
+    error = next((msg for msg in res.json if msg[0] == "error"), None)
+    assert "hash" in error[1].lower()
+
+
+def test_new_pages_error_key_not_hash(client, url_new_pages, cache, app):
+    data = {"INVALID_HASH": (p1.open("rb"), p1.name)}
+    res = client.post(url_new_pages, data=data)
+
+    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
+    error = next((msg for msg in res.json if msg[0] == "error"), None)
+    assert "key" in error[1].lower()
+    assert "hash" in error[1].lower()
+
+
 def test_new_pages_error_already_have(client, url_new_pages, cache, app):
-    app.config.update(STRICT_NEW_IMAGES=True)
-
     hs = md5(p1.read_bytes()).hexdigest()
     cache.set(hs, "DUMMY")
 
-    data = {p1.name: (p1.open("rb"), p1.name)}
-    res = client.post(url_new_pages, data=data)
-
-    assert 2 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
-    error = next((msg for msg in res.json if msg[0] == "error"), None)
-    assert "already" in error[1].lower()
-
-
-def test_new_pages_non_stop_already_have(client, url_new_pages, cache):
-    hs = md5(p1.read_bytes()).hexdigest()
-    cache.set(hs, "DUMMY")
-
-    data = {p1.name: (p1.open("rb"), p1.name)}
+    data = {hs: (p1.open("rb"), p1.name)}
     res = client.post(url_new_pages, data=data)
 
     assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
     error = next((msg for msg in res.json if msg[0] == "error"), None)
     assert "already" in error[1].lower()
-
-
-def test_new_pages_error_file_twice(client, url_new_pages, cache, app):
-    app.config.update(STRICT_NEW_IMAGES=True)
-
-    hs = md5(p1.read_bytes()).hexdigest()
-
-    data = {
-        p1.name: (p1.open("rb"), p1.name),
-        "copy_" + p1.name: (p1.open("rb"), "copy_" + p1.name),
-    }
-    res = client.post(url_new_pages, data=data)
-
-    assert 2 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
-    error = next((msg for msg in res.json if msg[0] == "error"), None)
-    assert "already" in error[1].lower()
-
-    assert cache.has(hs)
-    result = cache.get(hs)
-    assert "blocks" in result
-    assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
-
-
-def test_new_pages_non_stop_file_twice(client, url_new_pages, cache, app):
-    hs = md5(p1.read_bytes()).hexdigest()
-
-    data = {
-        p1.name: (p1.open("rb"), p1.name),
-        "copy_" + p1.name: (p1.open("rb"), "copy_" + p1.name),
-    }
-    res = client.post(url_new_pages, data=data)
-
-    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
-    error = next((msg for msg in res.json if msg[0] == "error"), None)
-    assert "already" in error[1].lower()
-
-    assert cache.has(hs)
-    result = cache.get(hs)
-    assert "blocks" in result
-    assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
 
 
 def test_new_pages_multiple_work(client, url_new_pages, cache, app):
-    app.config.update(STRICT_NEW_IMAGES=True)
+    hs1 = md5(p1.read_bytes()).hexdigest()
+    hs2 = md5(p2.read_bytes()).hexdigest()
 
     data = {
-        p1.name: (p1.open("rb"), p1.name),
-        p2.name: (p2.open("rb"), p2.name),
+        hs1: (p1.open("rb"), p1.name),
+        hs2: (p2.open("rb"), p2.name),
     }
     res = client.post(url_new_pages, data=data)
 
-    hs = md5(p1.read_bytes()).hexdigest()
-    assert cache.has(hs)
-    result = cache.get(hs)
+    assert cache.has(hs1)
+    result = cache.get(hs1)
     assert "blocks" in result
     assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
 
-    hs = md5(p2.read_bytes()).hexdigest()
-    assert cache.has(hs)
-    result = cache.get(hs)
+    assert cache.has(hs2)
+    result = cache.get(hs2)
     assert "blocks" in result
     # sometimes it finds something that is not text, like "・"
     assert 5 > len("".join(flat_map(lambda b: b['lines'], result["blocks"])))

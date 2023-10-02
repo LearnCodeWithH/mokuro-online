@@ -210,8 +210,8 @@
 
         async function doNewPages(new_files, url = 'v1/new_pages') {
             const form = new FormData();
-            for (const file of new_files) {
-                form.append(file.webkitRelativePath, file, file.name)
+            for (const [hs, file] of Object.entries(new_files)) {
+                form.append(hs, file, file.webkitRelativePath)
             }
             const res = await fetch(url, { method: 'POST', body: form });
             return await throwJsonError(res)
@@ -219,8 +219,8 @@
 
         async function doNewPagesStream(new_files, url = 'v1/new_pages?stream=1') {
             const form = new FormData();
-            for (const file of new_files) {
-                form.append(file.webkitRelativePath, file, file.name)
+            for (const [hs, file] of Object.entries(new_files)) {
+                form.append(hs, file, file.webkitRelativePath)
             }
 
             const res = await fetch(url, { method: 'POST', body: form, credentials: "omit" });
@@ -561,22 +561,26 @@
                 // Uploading new images
                 btnUpload.classList.toggle("is-loading", true)
 
-                const newFiles = []
+                const newHashes = []
+                const newFiles = {}
 
                 try {
                     const data = await doHashCheck(hashes);
-                    newFiles.push(...data.new.map(hs => images[hashes.findIndex((_hs) => _hs == hs)]))
+                    newHashes.push(...data.new)
+                    Object.assign(newFiles, Object.fromEntries(
+                        newHashes.map(hs => [hs, images[hashes.findIndex((_hs) => _hs == hs)]])
+                    ))
                 } catch (e) {
                     btnUpload.classList.toggle("is-loading", false)
                     btnUpload.classList.toggle("is-danger", true)
                     throw "Failed receiving list of missing images: " + e;
                 }
 
-                if (newFiles.length) {
+                if (newHashes.length) {
 
-                    const mb = (filesTotalSize(newFiles) / 1000 / 1000).toFixed(2)
-                    const notif = spawnNotif(logArea, "info", `<p>Uploading <b>${newFiles.length} new images</b>, <b>${mb}MB</b> of data in total.</p><p class="help"></p>`,
-                        newFiles.length * 2 // upload + OCR
+                    const mb = (filesTotalSize(Object.values(newFiles)) / 1000 / 1000).toFixed(2)
+                    const notif = spawnNotif(logArea, "info", `<p>Uploading <b>${newHashes.length} new images</b>, <b>${mb}MB</b> of data in total.</p><p class="help"></p>`,
+                        newHashes.length * 2 // upload + OCR
                     )
                     const help = notif.msgBlock.querySelector(".help")
 
