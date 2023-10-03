@@ -276,6 +276,8 @@ def do_page_ocr(hs, name, temp_file):
         current_app.extensions[PAGE_CACHE].set(hs, result)
 
         return hs, name, result
+    except AttributeError:
+        return hs, name, {"error": "Animation file, Corrupted file or Unsupported type"}
     except Exception as e:
         return hs, name, {"error": str(e)}
     finally:
