@@ -561,26 +561,29 @@
                 // Uploading new images
                 btnUpload.classList.toggle("is-loading", true)
 
-                const newHashes = []
-                const newFiles = {}
 
+                let data = { new: [], queue: [] }
                 try {
-                    const data = await doHashCheck(hashes);
-                    newHashes.push(...data.new)
-                    Object.assign(newFiles, Object.fromEntries(
-                        newHashes.map(hs => [hs, images[hashes.findIndex((_hs) => _hs == hs)]])
-                    ))
+                    data = await doHashCheck(hashes);
                 } catch (e) {
                     btnUpload.classList.toggle("is-loading", false)
                     btnUpload.classList.toggle("is-danger", true)
                     throw "Failed receiving list of missing images: " + e;
                 }
 
-                if (newHashes.length) {
+                const { new: newHashes, queue: inQueue } = data
+                const missing = [...inQueue, ...newHashes]
+                const newFiles = Object.fromEntries(
+                    missing.map(hs => [hs, images[hashes.findIndex((_hs) => _hs == hs)]])
+                )
 
+                if (missing.length) {
                     const mb = (filesTotalSize(Object.values(newFiles)) / 1000 / 1000).toFixed(2)
-                    const notif = spawnNotif(logArea, "info", `<p>Uploading <b>${newHashes.length} new images</b>, <b>${mb}MB</b> of data in total.</p><p class="help"></p>`,
-                        newHashes.length * 2 // upload + OCR
+                    const notif = spawnNotif(logArea, "info",
+                        (newHashes.length ? `<p>Uploading <b>${newHashes.length} new images</b> (<b>${mb}MB</b>)</p>` : "")
+                        + `<p>Awaiting OCR of <b>${missing.length} images</b>`
+                        + '<p class="help"></p>',
+                        2 * missing.length // upload + OCR
                     )
                     const help = notif.msgBlock.querySelector(".help")
 
@@ -590,10 +593,9 @@
                         const stream = await doNewPagesStream(newFiles)
                         await stream.pipeTo(new WritableStream({
                             async write(chunk) {
-                                console.log(chunk)
                                 if (chunk[1] == "success") {
                                     notif.barValue += 1;
-                                } else {
+                                } else if (chunk[1] != "info") {
                                     spawnNotif(logArea, chunk[1], chunk[0])
                                 }
                                 help.textContent = chunk[0];

@@ -122,66 +122,75 @@ def new_pages():
     if not request.files:
         yield cflash("No files were uploaded", "error")
 
-    for hs, file in request.files.items():
-        hs = hs.lower()
-        name = file.filename
+    try:
+        for hs, file in request.files.items():
+            hs = hs.lower()
+            name = file.filename
 
-        if not hash_reg.fullmatch(hs):
-            yield cflash(e_key_not_hash, "error")
-            continue
-
-        with current_app.queue_lock:
-            if hs in current_app.queue:
-                yield cflash(e_already_have, "error")
+            if not hash_reg.fullmatch(hs):
+                yield cflash(e_key_not_hash, "error")
                 continue
 
-        if current_app.extensions[PAGE_CACHE].has(hs):
-            yield cflash(e_already_have, "error")
-            continue
+            with current_app.queue_lock:
+                if hs in current_app.queue:
+                    yield cflash(f'Already have file "{name}" in queue', "success")
+                    jobs[hs] = current_app.queue[hs]
+                    continue
 
-        if file.content_length and file.content_length > MAX_IMAGE_SIZE:
-            yield cflash(e_too_large, "error")
-            continue
+            if current_app.extensions[PAGE_CACHE].has(hs):
+                yield cflash(f'Already have file "{name}" in cache', "success")
+                continue
 
-        if file.mimetype and not file.mimetype.startswith("image/"):
-            yield cflash(e_not_image, "error")
-            continue
+            if file.content_length and file.content_length > MAX_IMAGE_SIZE:
+                yield cflash(e_too_large, "error")
+                continue
 
-        blob = file.read()
+            if file.mimetype and not file.mimetype.startswith("image/"):
+                yield cflash(e_not_image, "error")
+                continue
 
-        if not blob:
-            yield cflash(e_file_empty, "error")
-            continue
+            blob = file.read()
 
-        if len(blob) > MAX_IMAGE_SIZE:
-            yield cflash(e_too_large, "error")
-            if STRICT_NEW_IMAGES:
-                yield cflash(e_unnaceptable, "error")
-                break
-            continue
+            if not blob:
+                yield cflash(e_file_empty, "error")
+                continue
 
-        if hs != md5(blob).hexdigest():
-            yield cflash(e_hash_no_match, "error")
-            if STRICT_NEW_IMAGES:
-                yield cflash(e_unnaceptable, "error")
-                break
-            continue
+            if len(blob) > MAX_IMAGE_SIZE:
+                yield cflash(e_too_large, "error")
+                if STRICT_NEW_IMAGES:
+                    yield cflash(e_unnaceptable, "error")
+                    break
+                continue
 
-        with current_app.queue_lock:
-            if hs in current_app.queue:
-                yield cflash(e_already_have, "error")
+            if hs != md5(blob).hexdigest():
+                yield cflash(e_hash_no_match, "error")
+                if STRICT_NEW_IMAGES:
+                    yield cflash(e_unnaceptable, "error")
+                    break
                 continue
 
             temp_file = tempfile.NamedTemporaryFile(prefix="mokuro_page_")
             temp_file.write(blob)
             jobs[hs] = (hs, name, temp_file)
-            current_app.queue[hs] = None  # TODO
-        yield cflash(f'Uploaded file "{name}" successfully', "success")
 
-    futures = [
-        current_app.extensions["executor"].submit(do_page_ocr, *job)
-        for job in jobs.values()
-    ]
+            yield cflash(f'Uploaded file "{name}" successfully', "success")
+    except Exception as e:
+        yield cflash(f'Failed uploads: {e}', "error")
+    finally:
+        with current_app.queue_lock:
+            futures = []
+            for hs, job in jobs.items():
+                if isinstance(job, tuple) and hs not in current_app.queue:
+                    future = current_app.extensions["executor"].submit(
+                        do_page_ocr, *job)
+                    current_app.queue[hs] = future
+                    futures.append(future)
+                elif isinstance(job, tuple):
+                    futures.append(current_app.queue[hs])
+                else:
+                    futures.append(job)
+
+    yield cflash('Awaiting OCR of files', "info")
 
     for future in concurrent.futures.as_completed(futures):
         hs, name, result = future.result()
