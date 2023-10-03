@@ -387,7 +387,7 @@
             notif.message = message
             notif.barMax = progressMax
 
-            box.appendChild(notif);
+            box.insertBefore(notif, box.firstElementChild)
 
             return notif
         }
