@@ -8,7 +8,7 @@ from functools import wraps
 from pathlib import Path, PurePath
 from hashlib import md5
 from flask import request, Response, Blueprint, current_app, flash, get_flashed_messages, stream_with_context
-from . import PAGE_CACHE
+from . import OCR_CACHE
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
 site = Blueprint('site', __name__)
@@ -58,7 +58,7 @@ def hash_check():
         new = tuple(
             hs for hs in hashes
             if (hs.lower() not in current_app.queue and
-                not current_app.extensions[PAGE_CACHE].has(hs.lower()))
+                not current_app.extensions[OCR_CACHE].has(hs.lower()))
         )
 
     return {"new": new, "queue": queue}
@@ -70,7 +70,7 @@ def ocr():
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
     hashes = tuple(hs for hs in dict.fromkeys(request.json))
-    results = current_app.extensions[PAGE_CACHE].get_many(
+    results = current_app.extensions[OCR_CACHE].get_many(
         *map(lambda hs: hs.lower(), hashes))
 
     ocr = {hs: rs for hs, rs in zip(hashes, results) if rs != None}
@@ -137,7 +137,7 @@ def new_pages():
                     jobs[hs] = current_app.queue[hs]
                     continue
 
-            if current_app.extensions[PAGE_CACHE].has(hs):
+            if current_app.extensions[OCR_CACHE].has(hs):
                 yield cflash(f'Already have file "{name}" in cache', "success")
                 continue
 
@@ -219,7 +219,7 @@ def make_html():
     page_map = tuple(
         zip(
             map(lambda img_tpl: img_tpl[0].strip(), request.json["page_map"]),
-            current_app.extensions[PAGE_CACHE].get_many(
+            current_app.extensions[OCR_CACHE].get_many(
                 *map(lambda img_tpl: img_tpl[1].lower(), request.json["page_map"])),
         )
     )
@@ -273,7 +273,7 @@ def do_page_ocr(hs, name, temp_file):
 
         flash(f'Starting OCR of "{name}"', "info")
         result = manga_page_ocr(path)
-        current_app.extensions[PAGE_CACHE].set(hs, result)
+        current_app.extensions[OCR_CACHE].set(hs, result)
 
         return hs, name, result
     except AttributeError:

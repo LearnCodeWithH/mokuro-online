@@ -4,7 +4,7 @@ from flask_executor import Executor
 from .config import DevelopmentConfig
 import threading
 
-PAGE_CACHE = "page_cache"
+OCR_CACHE = "OCR_CACHE"
 
 
 def create_app(config_class=DevelopmentConfig):
@@ -15,9 +15,9 @@ def create_app(config_class=DevelopmentConfig):
     app.config.from_prefixed_env(prefix="MOKURO_API")
 
     Executor(app)
-    app.extensions[PAGE_CACHE] = Cache(app, config={
-        key.removeprefix("PAGE_"): app.config[key]
-        for key in app.config.keys() if key.startswith("PAGE_CACHE_")})
+    app.extensions[OCR_CACHE] = Cache(app, config={
+        key.removeprefix("OCR_"): app.config[key]
+        for key in app.config.keys() if key.startswith("OCR_CACHE_")})
 
     with app.app_context():
         app.queue = dict()
