@@ -1,19 +1,30 @@
 from flask import Flask
 from flask_caching import Cache
 from flask_executor import Executor
-from .config import DevelopmentConfig
 from .db import SqliteCache
+import config
 import threading
+import os
 
 OCR_CACHE = "OCR_CACHE"
 
 
-def create_app(config_class=DevelopmentConfig):
+def create_app(config_class=None):
     app = Flask(__name__)
 
-    app.config.from_object(config_class)
-    app.config.from_envvar('MOKURO_API_SETTINGS', silent=True)
-    app.config.from_prefixed_env(prefix="MOKURO_API")
+    env = os.environ.get("MOKURO_ONLINE_ENV")
+    if config_class is not None:
+        app.config.from_object(config_class)
+    elif env == "production":
+        app.config.from_object(config.ProductionConfig)
+    elif env == "local":
+        app.config.from_object(config.LocalConfig)
+    elif env == "testing":
+        app.config.from_object(config.TestingConfig)
+    else:
+        app.config.from_object(config.DevelopmentConfig)
+
+    app.config.from_prefixed_env(prefix="MOKURO_ONLINE")
 
     Executor(app)
     app.extensions[OCR_CACHE] = Cache(app, config={

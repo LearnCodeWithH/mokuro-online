@@ -8,6 +8,7 @@ class Config(object):
     STRICT_NEW_IMAGES = True
     MAX_IMAGE_SIZE = 5_000_000  # 5MB
     EXECUTOR_MAX_WORKERS = 1
+    DEBUG = False
 
 
 class TestingConfig(Config):
@@ -17,8 +18,12 @@ class TestingConfig(Config):
 
 
 class DevelopmentConfig(Config):
-    pass
+    DEBUG = True
 
 
 class ProductionConfig(Config):
+    pass
+
+
+class LocalConfig(Config):
     pass
