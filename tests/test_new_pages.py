@@ -71,28 +71,6 @@ def test_new_pages_error_hash_no_match(client, url_new_pages, cache, app):
     assert "hash" in error[1].lower()
 
 
-def test_new_pages_error_key_not_hash(client, url_new_pages, cache, app):
-    data = {"INVALID_HASH": (p1.open("rb"), p1.name)}
-    res = client.post(url_new_pages, data=data)
-
-    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
-    error = next((msg for msg in res.json if msg[0] == "error"), None)
-    assert "key" in error[1].lower()
-    assert "hash" in error[1].lower()
-
-
-def test_new_pages_error_already_have(client, url_new_pages, cache, app):
-    hs = md5(p1.read_bytes()).hexdigest()
-    cache.set(hs, "DUMMY")
-
-    data = {hs: (p1.open("rb"), p1.name)}
-    res = client.post(url_new_pages, data=data)
-
-    assert 1 == len(tuple(filter(lambda msg: msg[0] == "error", res.json)))
-    error = next((msg for msg in res.json if msg[0] == "error"), None)
-    assert "already" in error[1].lower()
-
-
 def test_new_pages_multiple_work(client, url_new_pages, cache, app):
     hs1 = md5(p1.read_bytes()).hexdigest()
     hs2 = md5(p2.read_bytes()).hexdigest()

@@ -13,7 +13,7 @@ class Config(object):
 class TestingConfig(Config):
     TESTING = True
     STRICT_NEW_IMAGES = False
-    OCR_CACHE_PATH = ":memory:"
+    OCR_CACHE_TYPE = "SimpleCache"
 
 
 class DevelopmentConfig(Config):
