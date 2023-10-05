@@ -2,6 +2,7 @@ from flask import Flask
 from flask_caching import Cache
 from flask_executor import Executor
 from .config import DevelopmentConfig
+from .db import SqliteCache
 import threading
 
 OCR_CACHE = "OCR_CACHE"

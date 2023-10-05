@@ -161,3 +161,4 @@ cython_debug/
 
 # Runtime caches
 cache/
+*.sqlite3
