@@ -681,13 +681,15 @@
                 let ocr = row.processData.ocr
                 if (!ocr) {
                     const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
+                    ocr = _ocr;
 
-                    if (new_hashes.length) {
+                    if (!Object.keys(ocr).length) {
+                        throw `<b>ALL</b> files were missing`
+                    } else if (new_hashes.length) {
                         spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
                     } else {
-                        row.processData.ocr = _ocr
+                        row.processData.ocr = ocr
                     }
-                    ocr = _ocr;
                 }
 
 
@@ -737,7 +739,9 @@
                     const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
                     ocr = _ocr;
 
-                    if (new_hashes.length) {
+                    if (!Object.keys(ocr).length) {
+                        throw `<b>ALL</b> files were missing`
+                    } else if (new_hashes.length) {
                         spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
                     } else {
                         row.processData.ocr = ocr
