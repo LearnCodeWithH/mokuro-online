@@ -224,6 +224,7 @@
             }
 
             const res = await fetch(url, { method: 'POST', body: form, credentials: "omit" });
+            if (!res.ok) throw `${res.statusText} (${res.status})`
             return res.body
                 .pipeThrough(new TextDecoderStream())
                 .pipeThrough(new TransformStream(new JSONLTransformer()))
@@ -606,6 +607,7 @@
                     } catch (e) {
                         btnUpload.classList.toggle("is-loading", false)
                         btnUpload.classList.toggle("is-danger", true)
+                        notif.remove()
                         throw "Failed to upload files: " + e;
                     }
 
