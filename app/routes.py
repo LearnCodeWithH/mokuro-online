@@ -50,16 +50,25 @@ def hash_check():
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
     hashes = dict.fromkeys(request.json)
+    hashes_lower = tuple(map(str.lower, hashes))
     with current_app.queue_lock:
         queue = tuple(
-            hs for hs in hashes
-            if hs.lower() in current_app.queue
+            hs for hs, lhs in zip(hashes, hashes_lower)
+            if lhs in current_app.queue
         )
-        new = tuple(
-            hs for hs in hashes
-            if (hs.lower() not in current_app.queue and
-                not current_app.extensions[OCR_CACHE].has(hs.lower()))
-        )
+        if hasattr(current_app.extensions[OCR_CACHE], "has_many"):
+            in_cache = current_app.extensions[OCR_CACHE].has_many(
+                *hashes_lower)
+            new = tuple(
+                hs for hs, lhs in zip(hashes, hashes_lower)
+                if (lhs not in current_app.queue and lhs not in in_cache)
+            )
+        else:
+            new = tuple(
+                hs for hs, lhs in zip(hashes, hashes_lower)
+                if (lhs not in current_app.queue and
+                    not current_app.extensions[OCR_CACHE].has(lhs))
+            )
 
     return {"new": new, "queue": queue}
 
