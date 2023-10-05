@@ -39,9 +39,9 @@ def manga_page_ocr(*args, **kwargs):
     return og.mpocr(*args, **kwargs)
 
 
-@site.get('/online-mokuro')
-def online_mokuro():
-    return current_app.send_static_file('online-mokuro.html')
+@site.get('/')
+def index():
+    return current_app.send_static_file('index.html')
 
 
 @v1.post('/hash_check')
