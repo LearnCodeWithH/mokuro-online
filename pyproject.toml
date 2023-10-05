@@ -1,7 +1,7 @@
 [project]
-name = "mokuro-api"
+name = "mokuro-online"
 version = "0.0.1"
-description = "API to run mokuro in a dedicated server"
+description = "Flask app to run mokuro in a dedicated server, including a API"
 dependencies = [
     "mokuro",
     "Flask==2.3.3",
