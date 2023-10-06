@@ -32,6 +32,8 @@ def create_app(config_env=None):
 
     app.config.from_prefixed_env(prefix="MOKURO_ONLINE")
 
+    assert app.secret_key, "The app secret key was not configured."
+
     Executor(app)
     app.extensions[OCR_CACHE] = Cache(app, config={
         key.removeprefix("OCR_"): app.config[key]

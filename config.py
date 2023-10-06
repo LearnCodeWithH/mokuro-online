@@ -9,6 +9,7 @@ class Config(object):
     MAX_IMAGE_SIZE = 5_000_000  # 5MB
     EXECUTOR_MAX_WORKERS = 1
     DEBUG = False
+    SECRET_KEY = "- - - - - - - - - - - CHANGE THIS - - - - - - - - - - -"
 
 
 class TestingConfig(Config):
