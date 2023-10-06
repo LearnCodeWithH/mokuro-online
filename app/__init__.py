@@ -6,6 +6,7 @@ import config
 import threading
 import os
 import functools
+import logging
 
 OCR_CACHE = "OCR_CACHE"
 _og_lock = threading.Lock()
@@ -47,6 +48,13 @@ def create_app(config_env=None):
     else:
         if config_env == "production":
             app.config.from_object(config.ProductionConfig)
+
+            # TODO: implement proper logging. It shouldn't be mixed
+            # add gunicorn logger handlers.
+            gunicorn_logger = logging.getLogger('gunicorn.error')
+            app.logger.handlers = gunicorn_logger.handlers
+            app.logger.setLevel(gunicorn_logger.level)
+
         elif config_env == "local":
             app.config.from_object(config.LocalConfig)
         elif config_env == "testing":
@@ -54,7 +62,8 @@ def create_app(config_env=None):
         else:
             config_env = "development"
             app.config.from_object(config.DevelopmentConfig)
-        # TODO: log config_env
+        app.logger.info(
+            f"Starting mokuro-online with {config_env} environment")
 
     app.config.from_prefixed_env(prefix="MOKURO_ONLINE")
 

@@ -173,6 +173,7 @@ def new_pages():
                     futures.append(current_app.queue[hs])
                 else:
                     futures.append(job)
+        current_app.logger.info(f'User uploaded "{len(futures)} files"')
 
     yield cflash('Awaiting OCR of files', "info")
 
@@ -256,6 +257,7 @@ def do_page_ocr(hs, name, temp_file):
             raise Exception("Internal Server Error: path is not a file")
 
         flash(f'Starting OCR of "{name}"', "info")
+        current_app.logger.info(f'Starting OCR of "{name}"')
         result = manga_page_ocr(path)
         current_app.extensions[OCR_CACHE].set(hs, result)
 

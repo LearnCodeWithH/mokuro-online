@@ -48,6 +48,7 @@ class SqliteCache(BaseCache):
     @classmethod
     def factory(cls, app, config, args, kwargs):
         kwargs.update(dict(
+            logger=app.logger,
             path=config.get("CACHE_PATH"),
             default_timeout=config.get("CACHE_DEFAULT_TIMEOUT", None),
             threshold=config.get("CACHE_THRESHOLD", None),
