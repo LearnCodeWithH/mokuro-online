@@ -70,9 +70,11 @@ def create_app(config_env=None):
     assert app.secret_key, "The app secret key was not configured."
 
     Executor(app)
-    app.extensions[OCR_CACHE] = Cache(app, config={
+    ocr_env_config = {
         key.removeprefix("OCR_"): app.config[key]
-        for key in app.config.keys() if key.startswith("OCR_CACHE_")})
+        for key in app.config.keys() if key.startswith("OCR_CACHE_")}
+    ocr_env_config["CACHE_USE_JSON"] = True
+    app.extensions[OCR_CACHE] = Cache(app, config=ocr_env_config)
 
     with app.app_context():
         app.queue = dict()

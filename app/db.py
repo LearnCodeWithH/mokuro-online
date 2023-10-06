@@ -6,12 +6,13 @@ from functools import wraps
 import sqlite3
 import logging
 import pickle
+import json
 
 
 class SqliteCache(BaseCache):
     _CREATE_SQL = (
         'CREATE TABLE IF NOT EXISTS entries '
-        '( key TEXT PRIMARY KEY, val BLOB, exp FLOAT, updated FLOAT )'
+        '( key TEXT PRIMARY KEY, val {}, exp FLOAT, updated FLOAT )'
     )
     _CREATE_INDEX = 'CREATE INDEX IF NOT EXISTS keyname_index ON entries (key)'
     _HAS_SQL = 'SELECT      exp FROM entries WHERE key = ?'
@@ -29,18 +30,28 @@ class SqliteCache(BaseCache):
 
     _COUNT_ENTRIES_SQL = 'SELECT COUNT(*) FROM entries'
 
-    def __init__(self, path, default_timeout=0, threshold=0, max_size=0, logger=None, ignore_errors=True):
+    def __init__(self, path, default_timeout=0, threshold=0, max_size=0, logger=None, ignore_errors=False, use_json=False):
         BaseCache.__init__(self, default_timeout)
         self.path = path  # path of the database file
         self.threshold = threshold or 0  # maximum number of entries
         self.max_size = max_size or 0  # max size of the sqlite file in bytes
         self.mem_conn = None
         self.ignore_errors = ignore_errors
+        self.use_json = use_json
         self.logger = logger or logging.getLogger(__name__)
+
+        if self.use_json:
+            self._loader = lambda v: json.loads(v)
+            self._dumper = lambda v: json.dumps(v, ensure_ascii=False)
+        else:
+            self._loader = lambda v: pickle.loads(v)
+            self._dumper = lambda v: pickle.dumps(
+                v, protocol=pickle.HIGHEST_PROTOCOL)
 
         with self.get_connection() as conn:
             self.logger.debug(f'Connected to "{self.path}"')
-            conn.execute(self._CREATE_SQL)
+            conn.execute(self._CREATE_SQL.format(
+                "TEXT" if use_json else "BLOB"))
             conn.execute(self._CREATE_INDEX)
             conn.commit()
             conn.execute('VACUUM')
@@ -55,6 +66,7 @@ class SqliteCache(BaseCache):
             # dir=config.get("CACHE_DIR", None),
             max_size=config.get("CACHE_MAX_SIZE", None),
             ignore_errors=config.get("CACHE_IGNORE_ERRORS", False),
+            use_json=config.get("CACHE_USE_JSON", False),
         ))
         return cls(*args, **kwargs)
 
@@ -128,7 +140,7 @@ class SqliteCache(BaseCache):
             if row:
                 value, exp = row
                 if exp == 0 or exp > time():
-                    return pickle.loads(value)
+                    return self._loader(value)
 
     @log_sqlite_errors
     def get_many(self, *keys):
@@ -139,7 +151,7 @@ class SqliteCache(BaseCache):
             for row in cur.fetchall():
                 key, value, exp = row
                 if exp == 0 or exp > time():
-                    results[key] = pickle.loads(value)
+                    results[key] = self._loader(value)
             return [results.get(key) for key in keys]
 
     @log_sqlite_errors
@@ -170,11 +182,10 @@ class SqliteCache(BaseCache):
     def add(self, key, value, timeout=None):
         timeout = self._normalize_timeout(timeout)
         exp = 0 if timeout == 0 else time() + timeout
-        value = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
-        updated = time()
         with self.get_connection() as conn:
             try:
-                cur = conn.execute(self._ADD_SQL, (key, value, exp, updated))
+                cur = conn.execute(
+                    self._ADD_SQL, (key, self._dumper(value), exp, time()))
                 self.cleanup_full(conn)
                 return cur.rowcount > 0
             except sqlite3.IntegrityError:
@@ -184,10 +195,9 @@ class SqliteCache(BaseCache):
     def set(self, key, value, timeout=None):
         timeout = self._normalize_timeout(timeout)
         exp = 0 if timeout == 0 else time() + timeout
-        value = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
-        updated = time()
         with self.get_connection() as conn:
-            cur = conn.execute(self._SET_SQL, (key, value, exp, updated))
+            cur = conn.execute(
+                self._SET_SQL, (key, self._dumper(value), exp, time()))
             self.cleanup_full(conn)
             return cur.rowcount > 0
 
@@ -200,12 +210,7 @@ class SqliteCache(BaseCache):
         args = [
             item
             for key, value in mapping.items()
-            for item in (
-                key,
-                pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
-                exp,
-                time()
-            )
+            for item in (key, self._dumper(value), exp, time())
         ]
         with self.get_connection() as conn:
             conn.execute(sql, args)
