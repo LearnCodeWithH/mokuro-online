@@ -1,12 +1,11 @@
 import pytest
 from app import create_app, OCR_CACHE
-from config import TestingConfig
 from flask import url_for
 
 
 @pytest.fixture()
 def app():
-    app = create_app(TestingConfig)
+    app = create_app("testing")
     app.secret_key = b"dummy_key"
     with app.test_request_context():
         yield app

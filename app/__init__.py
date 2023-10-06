@@ -9,20 +9,26 @@ import os
 OCR_CACHE = "OCR_CACHE"
 
 
-def create_app(config_class=None):
+def create_app(config_env=None):
     app = Flask(__name__)
 
-    env = os.environ.get("MOKURO_ONLINE_ENV")
-    if config_class is not None:
-        app.config.from_object(config_class)
-    elif env == "production":
-        app.config.from_object(config.ProductionConfig)
-    elif env == "local":
-        app.config.from_object(config.LocalConfig)
-    elif env == "testing":
-        app.config.from_object(config.TestingConfig)
+    if config_env is None:
+        config_env = os.environ.get("MOKURO_ONLINE_ENV", "dev")
+
+    if not isinstance(config_env, str):
+        # if not a string, it's a object
+        app.config.from_object(config_env)
     else:
-        app.config.from_object(config.DevelopmentConfig)
+        if config_env == "production":
+            app.config.from_object(config.ProductionConfig)
+        elif config_env == "local":
+            app.config.from_object(config.LocalConfig)
+        elif config_env == "testing":
+            app.config.from_object(config.TestingConfig)
+        else:
+            config_env = "development"
+            app.config.from_object(config.DevelopmentConfig)
+        # TODO: log config_env
 
     app.config.from_prefixed_env(prefix="MOKURO_ONLINE")
 
