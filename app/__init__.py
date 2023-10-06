@@ -5,8 +5,34 @@ from .db import SqliteCache
 import config
 import threading
 import os
+import functools
 
 OCR_CACHE = "OCR_CACHE"
+_og_lock = threading.Lock()
+
+
+@functools.cache
+def overlay_generator():
+    if _og_lock.locked():
+        # await until the first cached call completes
+        with _og_lock:
+            return overlay_generator()
+    with _og_lock:
+        # This take way too long to import
+        from mokuro import OverlayGenerator
+        og = OverlayGenerator()
+        return og
+
+
+def manga_page_ocr(*args, **kwargs):
+    og = overlay_generator()
+    if og.mpocr is None:
+        with _og_lock:
+            # This take way too long to init
+            og.init_models()
+    if not args and not kwargs:
+        return
+    return og.mpocr(*args, **kwargs)
 
 
 def create_app(config_env=None):
@@ -42,6 +68,10 @@ def create_app(config_env=None):
     with app.app_context():
         app.queue = dict()
         app.queue_lock = threading.Lock()
+        # preload OCR generator. executor needs a request context to work
+        if config_env == "production":
+            with app.test_request_context():
+                app.extensions["executor"].submit(lambda: manga_page_ocr())
 
     from . import routes
     app.register_blueprint(routes.v1)

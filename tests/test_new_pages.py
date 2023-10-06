@@ -1,7 +1,7 @@
 import io
 from pathlib import Path
 from hashlib import md5
-from app.routes import manga_page_ocr
+from app import manga_page_ocr
 
 test_dir = Path(__file__).parent
 p1 = Path(__file__).parent / "res/page1.webp"

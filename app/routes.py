@@ -1,42 +1,17 @@
 import json
 import re
 import concurrent.futures
-import functools
 import threading
 import tempfile
 from functools import wraps
 from pathlib import Path, PurePath
 from hashlib import md5
 from flask import request, Response, Blueprint, current_app, flash, get_flashed_messages, stream_with_context
-from . import OCR_CACHE
+from . import OCR_CACHE, overlay_generator, manga_page_ocr
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
 site = Blueprint('site', __name__)
 hash_reg = re.compile("[a-f0-9]{32}")
-_og_lock = threading.Lock()
-
-
-@functools.cache
-def overlay_generator():
-    if _og_lock.locked():
-        # await until the first call completes
-        with _og_lock:
-            return overlay_generator()
-    with _og_lock:
-        # This take way too long to import
-        from mokuro import OverlayGenerator
-        og = OverlayGenerator()
-
-        return og
-
-
-def manga_page_ocr(*args, **kwargs):
-    og = overlay_generator()
-    if og.mpocr is None:
-        with _og_lock:
-            # This take way too long to init
-            og.init_models()
-    return og.mpocr(*args, **kwargs)
 
 
 @site.get('/')
