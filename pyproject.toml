@@ -1,14 +1,29 @@
-[project]
+[tool.poetry]
 name = "mokuro-online"
-version = "0.0.1"
+version = "0.1.0"
 description = "Flask app to run mokuro in a dedicated server, including a API"
-dependencies = [
-    "mokuro",
-    "Flask==2.3.3",
-    "Flask-Caching==2.0.2",
-]
+authors = ["imsamuka <imsamuka@gmail.com>"]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+mokuro = "^0.1.7"
+Flask = "^2.3.3"
+Flask-Caching = "^2.0.2"
+Flask-Executor = "^1.0.0"
+torch = "2.0.0"
+torchvision = "0.15.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+autopep8 = "^2.0.4"
 
 [tool.pytest.ini_options]
 pythonpath = [
   "."
 ]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

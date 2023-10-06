@@ -94,7 +94,7 @@ def test_make_html_simple_works(client, url_make_html, cache):
 
     data = {"title": "Chapter 1.1", "page_map": [["page1.jpg", hs]]}
     res = client.post(url_make_html, json=data)
-    assert res.status_code == 200
+    assert res.status_code == 200, res.json["error"]
 
 
 def test_make_html_works(client, url_make_html, cache):
@@ -103,4 +103,4 @@ def test_make_html_works(client, url_make_html, cache):
     pages = [[f"{int(hs):02}.jpg", hs] for hs in test_chapter]
     data = {"title": "Chapter 1.1", "page_map": pages}
     res = client.post(url_make_html, json=data)
-    assert res.status_code == 200
+    assert res.status_code == 200, res.json["error"]
