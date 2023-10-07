@@ -30,8 +30,8 @@ def cache(app):
 # Urls
 
 @pytest.fixture()
-def url_hash_check(app):
-    return url_for("v1.hash_check")
+def url_hashes(app):
+    return url_for("v1.hashes")
 
 
 @pytest.fixture()

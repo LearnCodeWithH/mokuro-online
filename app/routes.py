@@ -19,33 +19,33 @@ def index():
     return current_app.send_static_file('index.html')
 
 
-@v1.post('/hash_check')
-def hash_check():
+@v1.post('/hashes')
+def hashes():
     if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
     hashes = dict.fromkeys(request.json)
+    if not hashes:
+        return {"new": [], "in_queue": [], "in_cache": []}
     hashes_lower = tuple(map(str.lower, hashes))
+
     with current_app.queue_lock:
         queue = tuple(
             hs for hs, lhs in zip(hashes, hashes_lower)
             if lhs in current_app.queue
         )
-        if hasattr(current_app.extensions[OCR_CACHE], "has_many"):
-            in_cache = current_app.extensions[OCR_CACHE].has_many(
-                *hashes_lower)
-            new = tuple(
-                hs for hs, lhs in zip(hashes, hashes_lower)
-                if (lhs not in current_app.queue and lhs not in in_cache)
-            )
-        else:
-            new = tuple(
-                hs for hs, lhs in zip(hashes, hashes_lower)
-                if (lhs not in current_app.queue and
-                    not current_app.extensions[OCR_CACHE].has(lhs))
-            )
 
-    return {"new": new, "queue": queue}
+    if hasattr(current_app.extensions[OCR_CACHE], "has_many"):
+        cache = current_app.extensions[OCR_CACHE].has_many(*hashes_lower)
+    else:
+        def has_in_cache(lhs):
+            return current_app.extensions[OCR_CACHE].has(lhs)
+        cache = tuple(map(has_in_cache, hashes_lower))
+
+    cache = tuple(hs for hs, in_cache in zip(hashes, cache) if in_cache)
+    new = tuple(hs for hs in hashes if hs not in (*queue, *cache))
+
+    return {"new": new, "in_queue": queue, "in_cache": cache}
 
 
 @v1.post('/ocr')

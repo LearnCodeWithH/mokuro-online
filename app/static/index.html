@@ -190,7 +190,7 @@
             return data
         }
 
-        async function doHashCheck(hashes, url = 'v1/hash_check') {
+        async function doHashes(hashes, url = 'v1/hashes') {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', },
@@ -563,16 +563,16 @@
                 btnUpload.classList.toggle("is-loading", true)
 
 
-                let data = { new: [], queue: [] }
+                let data = { new: [], in_queue: [] }
                 try {
-                    data = await doHashCheck(hashes);
+                    data = await doHashes(hashes);
                 } catch (e) {
                     btnUpload.classList.toggle("is-loading", false)
                     btnUpload.classList.toggle("is-danger", true)
                     throw "Failed receiving list of missing images: " + e;
                 }
 
-                const { new: newHashes, queue: inQueue } = data
+                const { new: newHashes, in_queue: inQueue } = data
                 const missing = [...inQueue, ...newHashes]
                 const newFiles = Object.fromEntries(
                     missing.map(hs => [hs, images[hashes.findIndex((_hs) => _hs == hs)]])
