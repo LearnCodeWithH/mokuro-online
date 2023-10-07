@@ -199,7 +199,7 @@
             return await throwJsonError(res)
         }
 
-        async function doOCR(hashes, url = 'v1/ocr') {
+        async function doResults(hashes, url = 'v1/results') {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', },
@@ -680,17 +680,17 @@
                 const row = event.target.closest(".columns")
                 const { selectedDir, images, hashes } = row.processData
 
-                let ocr = row.processData.ocr
-                if (!ocr) {
-                    const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
-                    ocr = _ocr;
+                let results = row.processData.results
+                if (!results) {
+                    const { results: _results, new: newHashes } = await doResults(hashes)
+                    results = _results;
 
-                    if (!Object.keys(ocr).length) {
+                    if (!Object.keys(results).length) {
                         throw `<b>ALL</b> files were missing`
-                    } else if (new_hashes.length) {
-                        spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
+                    } else if (newHashes.length) {
+                        spawnNotif(logArea, "error", `Failed to get OCR results of <b>${newHashes.length}</b> files`)
                     } else {
-                        row.processData.ocr = ocr
+                        row.processData.results = results
                     }
                 }
 
@@ -699,7 +699,7 @@
 
                 for (const i in images) {
                     const f = images[i]
-                    const ocr_content = ocr[hashes[i]]
+                    const ocr_content = results[hashes[i]]
                     if (!ocr_content) continue
 
                     const file_name = f.webkitRelativePath.substring(
@@ -720,7 +720,7 @@
                 a.click()
 
             } catch (e) {
-                spawnNotif(logArea, "error", "Failed to get OCR file: " + e)
+                spawnNotif(logArea, "error", "Failed to get OCR results: " + e)
                 throw e
             } finally {
                 btn.classList.toggle("is-loading", false)
@@ -736,17 +736,17 @@
                 const row = event.target.closest(".columns")
                 const { selectedDir, images, hashes } = row.processData
 
-                let ocr = row.processData.ocr
-                if (!ocr) {
-                    const { ocr: _ocr, new: new_hashes } = await doOCR(hashes)
-                    ocr = _ocr;
+                let results = row.processData.results
+                if (!results) {
+                    const { results: _results, new: newHashes } = await doResults(hashes)
+                    results = _results;
 
-                    if (!Object.keys(ocr).length) {
+                    if (!Object.keys(results).length) {
                         throw `<b>ALL</b> files were missing`
-                    } else if (new_hashes.length) {
-                        spawnNotif(logArea, "error", `Failed to get OCR of <b>${new_hashes.length}</b> files`)
+                    } else if (newHashes.length) {
+                        spawnNotif(logArea, "error", `Failed to get OCR results of <b>${newHashes.length}</b> files`)
                     } else {
-                        row.processData.ocr = ocr
+                        row.processData.results = results
                     }
                 }
 
@@ -757,7 +757,7 @@
                 textModal.classList.toggle('is-active', true);
 
             } catch (e) {
-                spawnNotif(logArea, "error", "Failed to get OCR file: " + e)
+                spawnNotif(logArea, "error", "Failed to get OCR results: " + e)
                 throw e
             }
         }
@@ -787,13 +787,13 @@
             if (!textModal.row) throw "No row set-up yet available"
             const includeTitles = document.getElementById("includeTitles");
 
-            const { selectedDir, images, hashes, ocr } = textModal.row.processData
+            const { selectedDir, images, hashes, results } = textModal.row.processData
 
             let textResult = ""
 
             for (const i in images) {
                 const f = images[i]
-                const ocr_content = ocr[hashes[i]]
+                const ocr_content = results[hashes[i]]
                 if (!ocr_content) continue;
 
                 if (includeTitles.checked) {

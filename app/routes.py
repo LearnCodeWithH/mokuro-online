@@ -48,8 +48,8 @@ def hashes():
     return {"new": new, "in_queue": queue, "in_cache": cache}
 
 
-@v1.post('/ocr')
-def ocr():
+@v1.post('/results')
+def results():
     if not (request.is_json and valid_hash_list(request.json)):
         return {"error": "Only JSON arrays of MD5 hashes are accepted"}, 415
 
@@ -60,7 +60,7 @@ def ocr():
     ocr = {hs: rs for hs, rs in zip(hashes, results) if rs != None}
     new = tuple(hs for hs, rs in zip(hashes, results) if rs == None)
 
-    return {"ocr": ocr, "new": new}
+    return {"new": new, "results": ocr}
 
 
 def flashes_or_jsonlstream():
