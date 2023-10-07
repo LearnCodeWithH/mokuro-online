@@ -173,7 +173,7 @@ def new_pages():
                     futures.append(current_app.queue[hs])
                 else:
                     futures.append(job)
-        current_app.logger.info(f'User uploaded "{len(futures)} files"')
+        current_app.logger.info(f'User uploaded {len(futures)} files')
 
     yield cflash('Awaiting OCR of files', "info")
 
@@ -247,6 +247,20 @@ def valid_image_map(img_map):
     )
 
 
+def map_recursive(func, obj):
+    if isinstance(obj, dict):
+        return {k: map_recursive(func, v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [map_recursive(func, elem) for elem in obj]
+    else:
+        return func(obj)
+
+
+def numpy_to_native(v):
+    # numpy dtypes have a .item() to convert themselves to a native python type
+    return v.item() if hasattr(v, "item") else v
+
+
 def do_page_ocr(hs, name, temp_file):
     try:
         path = Path(temp_file.name)
@@ -259,6 +273,7 @@ def do_page_ocr(hs, name, temp_file):
         flash(f'Starting OCR of "{name}"', "info")
         current_app.logger.info(f'Starting OCR of "{name}"')
         result = manga_page_ocr(path)
+        result = map_recursive(numpy_to_native, result)
         current_app.extensions[OCR_CACHE].set(hs, result)
 
         return hs, name, result
