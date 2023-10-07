@@ -198,25 +198,23 @@ def make_html():
         "page_map" in request.json and
         valid_image_map(request.json["page_map"])
     ):
-        return {"error": 'Only non-empty JSON objects accepted.\nSchema: {"title": "file_title", "page_map": [[img_path, img_hash], ...]}'}, 415
+        return {"error": 'Only non-empty JSON objects accepted.' +
+                '\nSchema: {"title": "file_title", "page_map": [[img_path, img_hash], ...]}'}, 415
+
+    results = current_app.extensions[OCR_CACHE].get_many(
+        *map(lambda it: it[1].lower(), request.json["page_map"]))
+
+    if not all(results):
+        return {"error": "Asked for page not in cache"}, 400
 
     title = request.json["title"].strip()
-    page_map = tuple(
-        zip(
-            map(lambda img_tpl: img_tpl[0].strip(), request.json["page_map"]),
-            current_app.extensions[OCR_CACHE].get_many(
-                *map(lambda img_tpl: img_tpl[1].lower(), request.json["page_map"])),
-        )
-    )
-
-    if not all(page_map):
-        return {"error": "Asked for page not in cache"}, 400
+    paths = tuple(map(lambda it: it[0].strip(), request.json["page_map"]))
 
     try:
         og = overlay_generator()
         page_htmls = [
-            og.get_page_html(image_result, PurePath(image_path))
-            for image_path, image_result in page_map
+            og.get_page_html(result, PurePath(path))
+            for path, result in zip(paths, results)
         ]
         return og.get_index_html(page_htmls, f'{title} | mokuro', True, False)
 
