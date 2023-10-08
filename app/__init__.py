@@ -46,15 +46,15 @@ def create_app(config_env=None):
         # if not a string, it's a object
         app.config.from_object(config_env)
     else:
-        if config_env == "production":
-            app.config.from_object(config.ProductionConfig)
-
+        if config_env in ["production", "local"]:
             # TODO: implement proper logging. It shouldn't be mixed
             # add gunicorn logger handlers.
             gunicorn_logger = logging.getLogger('gunicorn.error')
             app.logger.handlers = gunicorn_logger.handlers
             app.logger.setLevel(gunicorn_logger.level)
 
+        if config_env == "production":
+            app.config.from_object(config.ProductionConfig)
         elif config_env == "local":
             app.config.from_object(config.LocalConfig)
         elif config_env == "testing":

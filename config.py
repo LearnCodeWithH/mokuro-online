@@ -26,5 +26,6 @@ class ProductionConfig(Config):
     pass
 
 
-class LocalConfig(Config):
+class LocalConfig(ProductionConfig):
+    # This copies ProductionConfig configs as well
     pass
