@@ -163,17 +163,20 @@ def new_pages():
     finally:
         with current_app.queue_lock:
             futures = []
+            uploaded = 0
             for hs, job in jobs.items():
                 if isinstance(job, tuple) and hs not in current_app.queue:
                     future = current_app.extensions[OCR_EXECUTOR].submit(
                         do_page_ocr, *job)
                     current_app.queue[hs] = future
                     futures.append(future)
+                    uploaded += 1
                 elif isinstance(job, tuple):
                     futures.append(current_app.queue[hs])
                 else:
                     futures.append(job)
-        current_app.logger.info(f'User uploaded {len(futures)} files')
+        if uploaded:
+            current_app.logger.info(f'User uploaded {uploaded} files')
 
     yield cflash('Awaiting OCR of files', "info")
 
