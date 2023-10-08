@@ -4,8 +4,8 @@ from hashlib import md5
 from app import manga_page_ocr
 
 test_dir = Path(__file__).parent
-p1 = Path(__file__).parent / "res/page1.webp"
-p2 = Path(__file__).parent / "res/page2.jpg"
+p1 = test_dir / "res/page1.webp"
+p2 = test_dir / "res/page2.jpg"
 
 
 def flat_map(f, xs):
@@ -71,6 +71,19 @@ def test_new_pages_error_hash_no_match(client, url_new_pages, cache, app):
     assert "hash" in error[1].lower()
 
 
+def test_manga_page_ocr_works_p1(client, url_make_html, cache):
+    result = manga_page_ocr(p1)
+    assert "blocks" in result
+    assert "たすけて" in "".join(flat_map(lambda b: b['lines'], result["blocks"]))
+
+
+def test_manga_page_ocr_works_p2(client, url_make_html, cache):
+    result = manga_page_ocr(p2)
+    # sometimes it finds something that is not text, like "・"
+    assert "blocks" in result
+    assert 5 > len("".join(flat_map(lambda b: b['lines'], result["blocks"])))
+
+
 def test_new_pages_multiple_work(client, url_new_pages, cache, app):
     hs1 = md5(p1.read_bytes()).hexdigest()
     hs2 = md5(p2.read_bytes()).hexdigest()
@@ -89,5 +102,4 @@ def test_new_pages_multiple_work(client, url_new_pages, cache, app):
     assert cache.has(hs2)
     result = cache.get(hs2)
     assert "blocks" in result
-    # sometimes it finds something that is not text, like "・"
     assert 5 > len("".join(flat_map(lambda b: b['lines'], result["blocks"])))

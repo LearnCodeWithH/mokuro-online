@@ -1,4 +1,5 @@
 import json
+from app import overlay_generator
 from pathlib import Path, PurePath
 
 tc = Path(__file__).parent / "res/test_chapter.json"
@@ -85,6 +86,15 @@ def test_make_html_not_in_cache(client, url_make_html):
     res = client.post(url_make_html, json=data)
     assert "error" in res.json
     assert res.status_code != 200
+
+
+def test_overlay_generator_works(client, url_make_html, cache):
+    og = overlay_generator()
+    result = {"version": "0.1.7", "img_width": 1350,
+              "img_height": 1920, "blocks": []}
+    page_htmls = [og.get_page_html(result, PurePath("page1.jpg"))]
+    html = og.get_index_html(page_htmls, 'Chapter 1.1 | mokuro', True, False)
+    assert "html" in html
 
 
 def test_make_html_simple_works(client, url_make_html, cache):
