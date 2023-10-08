@@ -23,7 +23,7 @@ class DevelopmentConfig(Config):
 
 
 class ProductionConfig(Config):
-    pass
+    PRELOAD_OCR = True
 
 
 class LocalConfig(ProductionConfig):

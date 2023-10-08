@@ -79,8 +79,9 @@ def create_app(config_env=None):
     with app.app_context():
         app.queue = dict()
         app.queue_lock = threading.Lock()
-        # preload OCR generator. executor needs a request context to work
-        if config_env == "production":
+        if app.config.get("PRELOAD_OCR"):
+            app.logger.info("Preloading MangaPageOCR")
+            # executor needs a request context to work
             with app.test_request_context():
                 app.extensions["executor"].submit(lambda: manga_page_ocr())
 
