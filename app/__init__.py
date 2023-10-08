@@ -9,6 +9,7 @@ import functools
 import logging
 
 OCR_CACHE = "OCR_CACHE"
+OCR_EXECUTOR = "OCR_EXECUTOR"
 _og_lock = threading.Lock()
 
 
@@ -69,12 +70,12 @@ def create_app(config_env=None):
 
     assert app.secret_key, "The app secret key was not configured."
 
-    Executor(app)
     ocr_env_config = {
         key.removeprefix("OCR_"): app.config[key]
         for key in app.config.keys() if key.startswith("OCR_CACHE_")}
     ocr_env_config["CACHE_USE_JSON"] = True
     app.extensions[OCR_CACHE] = Cache(app, config=ocr_env_config)
+    app.extensions[OCR_EXECUTOR] = Executor(app, name="OCR_")
 
     with app.app_context():
         app.queue = dict()
@@ -83,7 +84,7 @@ def create_app(config_env=None):
             app.logger.info("Preloading MangaPageOCR")
             # executor needs a request context to work
             with app.test_request_context():
-                app.extensions["executor"].submit(lambda: manga_page_ocr())
+                app.extensions[OCR_EXECUTOR].submit(lambda: manga_page_ocr())
 
     from . import routes
     app.register_blueprint(routes.v1)

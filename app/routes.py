@@ -7,7 +7,7 @@ from functools import wraps
 from pathlib import Path, PurePath
 from hashlib import md5
 from flask import request, Response, Blueprint, current_app, flash, get_flashed_messages, stream_with_context
-from . import OCR_CACHE, overlay_generator, manga_page_ocr
+from . import OCR_CACHE, OCR_EXECUTOR, overlay_generator, manga_page_ocr
 
 v1 = Blueprint('v1', __name__, url_prefix='/v1')
 site = Blueprint('site', __name__)
@@ -165,7 +165,7 @@ def new_pages():
             futures = []
             for hs, job in jobs.items():
                 if isinstance(job, tuple) and hs not in current_app.queue:
-                    future = current_app.extensions["executor"].submit(
+                    future = current_app.extensions[OCR_EXECUTOR].submit(
                         do_page_ocr, *job)
                     current_app.queue[hs] = future
                     futures.append(future)
