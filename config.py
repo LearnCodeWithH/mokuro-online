@@ -5,9 +5,9 @@ class Config(object):
     OCR_CACHE_THRESHOLD = 0
     OCR_CACHE_DEFAULT_TIMEOUT = 0
     OCR_CACHE_IGNORE_ERRORS = False
+    OCR_EXECUTOR_MAX_WORKERS = 1
     STRICT_NEW_IMAGES = True
     MAX_IMAGE_SIZE = 5_000_000  # 5MB
-    EXECUTOR_MAX_WORKERS = 1
     DEBUG = False
     SECRET_KEY = "- - - - - - - - - - - CHANGE THIS - - - - - - - - - - -"
 

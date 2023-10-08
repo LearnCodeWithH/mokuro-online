@@ -75,7 +75,7 @@ def create_app(config_env=None):
         for key in app.config.keys() if key.startswith("OCR_CACHE_")}
     ocr_env_config["CACHE_USE_JSON"] = True
     app.extensions[OCR_CACHE] = Cache(app, config=ocr_env_config)
-    app.extensions[OCR_EXECUTOR] = Executor(app, name="OCR_")
+    app.extensions[OCR_EXECUTOR] = Executor(app, name="ocr")
 
     with app.app_context():
         app.queue = dict()
