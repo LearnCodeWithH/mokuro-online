@@ -8,14 +8,10 @@ license = "GPL-3.0-or-later"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-mokuro = "^0.1.7"
+mokuro = "^0.1.8"
 Flask = "^2.3.3"
-Flask-Caching = "^2.0.2"
+Flask-Caching = "^2.3.0"
 Flask-Executor = "^1.0.0"
-torch = "2.0.0"
-torchvision = "0.15.1"
-gunicorn = "^21.2.0"
-opencv-python-headless = "^4.8.1.78"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
