@@ -74,7 +74,7 @@ Build and run the Docker image:
 
 ```
 docker build -t local/mokuro-online-cuda -f ./Dockerfile .
-docker run --gpus all --publish $APP_PORT:$APP_PORT --env APP_PORT=$APP_PORT --detach local/mokuro-online-cuda
+docker run --publish $APP_PORT:$APP_PORT --env APP_PORT=$APP_PORT --detach local/mokuro-online-cuda
 ```
 
 ### With CUDA support
