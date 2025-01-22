@@ -67,3 +67,20 @@ server {
     }
 }
 ```
+
+## Running on Docker
+
+Build and run the Docker image:
+
+```
+docker build -t local/mokuro-online-cuda -f ./Dockerfile .
+docker run --publish $APP_PORT:$APP_PORT --env APP_PORT=$APP_PORT --detach local/mokuro-online-cuda
+```
+
+### With CUDA support
+
+You'll need to make sure you have everything set up for docker to access your GPU [as outlined here.](https://saturncloud.io/blog/how-to-use-gpu-from-a-docker-container-a-guide-for-data-scientists-and-software-engineers/)
+
+```
+docker run --gpus all --publish $APP_PORT:$APP_PORT --env APP_PORT=$APP_PORT --detach local/mokuro-online-cuda
+```
